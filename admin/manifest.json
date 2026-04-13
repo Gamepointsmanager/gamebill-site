@@ -4,8 +4,8 @@
   "description": "GameBill Access Manager",
 
   "start_url": "./",
-  "scope": "./",
-  "id": "./",
+  "scope": "./admin/",
+  "id": "gamebill-admin",
 
   "display": "standalone",
   "orientation": "any",
