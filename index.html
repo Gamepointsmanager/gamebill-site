@@ -4382,17 +4382,22 @@
     }
 
     function getCompanyCreditBalance(c) {
-      // Credit originates ONLY from extra payments.
-      // Credit is consumed when a bill has creditApplied > 0 (recorded at save time).
+      // Credit comes from payments that EXCEED what was owed (isGeneral payments stored as leftover).
+      // fromCredit payments were used to clear specific bill balances — they are NOT available credit.
+      // creditApplied on a bill = credit consumed when the bill was originally saved.
       var totalExtraPayments = 0;
       var totalCreditConsumed = 0;
       var compBills = state.bills.filter(function(b) { return b.companyId === c._id; });
       for (var i = 0; i < compBills.length; i++) {
         var bill = compBills[i];
-        // Sum up all extra payments (the source of credit)
-        var exP = (bill.extraPayments || []).reduce(function(s, p) { return s + (p.amount || 0); }, 0);
-        totalExtraPayments += exP;
-        // Sum up all credit already consumed by saved bills
+        var eps = bill.extraPayments || [];
+        for (var j = 0; j < eps.length; j++) {
+          var ep = eps[j];
+          // Only count payments that are NOT fromCredit (fromCredit = already applied to clear a bill)
+          if (!ep.fromCredit) {
+            totalExtraPayments += (ep.amount || 0);
+          }
+        }
         totalCreditConsumed += (bill.creditApplied || 0);
       }
       var net = totalExtraPayments - totalCreditConsumed;
@@ -4980,10 +4985,14 @@
         var bPaid = bill.paymentStatus==='received'
           ? Math.max(0, bFull - _bCredit)
           : (bill.paymentStatus==='partial' ? Math.max(0, (bill.partialAmount||0) - _bCredit) : 0);
-        var exP=0,exs=bill.extraPayments||[];for(var ei=0;ei<exs.length;ei++)exP+=(exs[ei].amount||0);
-        var thisRec=bPaid+exP; tRec+=thisRec;
+        // Only count real external payments (not fromCredit internal transfers) in received total
+        var exP=0,exsReal=0,exs=bill.extraPayments||[];
+        for(var ei=0;ei<exs.length;ei++){
+          exP+=(exs[ei].amount||0); // all extra payments (for balance calc)
+          if(!exs[ei].fromCredit) exsReal+=(exs[ei].amount||0); // only real money received
+        }
+        var thisRec=bPaid+exsReal; tRec+=thisRec;
         // adjBal: remaining balance after payments AND extra payments
-        // Never let adjBal go below -trueCreditBal to avoid double-counting
         var rawBal=(bill.balanceDue||0);
         var adjBal=rawBal>0?Math.max(0,rawBal-exP):rawBal; tBal+=adjBal;
         rcDet.push({date:bill.date,amount:thisRec,billTotal:bD,status:bill.paymentStatus,extraPayments:exs,billId:bill._id,adjBalance:adjBal});
@@ -5380,23 +5389,23 @@
       document.getElementById('paySave').onclick=async function(){var bid=document.getElementById('payBill').value,amt=parseFloat(document.getElementById('payAmt').value)||0,dt=document.getElementById('payDt').value;if(!bid||amt<=0){alert('Enter an amount');return}
         try{
           if(bid==='__general__'){
-            // General payment — add as extraPayment on most recent bill
+            var payDate = dt || new Date().toISOString().slice(0,10);
             var latestBill = d.compBills[0]; // already sorted newest first
-            if(latestBill && latestBill._id){
-              var ref2=db.doc(userPath()+'/bills/'+latestBill._id);
-              var sn2=await ref2.get();
-              var ep2=(sn2.data().extraPayments||[]);
-              ep2.push({amount:amt,date:dt||new Date().toISOString().slice(0,10),isGeneral:true});
-              await trackedWrite(function(){return ref2.update({extraPayments:ep2})});
-              
-              // Auto-apply credit to unpaid bills chronologically
-              var creditRemaining = amt;
+
+            if(!latestBill || !latestBill._id){
+              // No real bills yet — create a payment-only entry to hold the credit
+              var payBill={companyId:c._id,companyName:c.name,date:new Date().toISOString(),convMode:'pts2dollar',items:[],totalDollars:0,totalPoints:0,paymentStatus:'received',partialAmount:0,balanceDue:0,extraPayments:[{amount:amt,date:payDate,isGeneral:true}]};
+              await trackedWrite(function(){return db.collection(userPath()+'/bills').add(payBill)});
+            } else {
+              // Step 1: Find all bills with a remaining balance, oldest first
               var unpaidBills = d.compBills.filter(function(b){
                 var exPay = (b.extraPayments||[]).reduce(function(s,p){return s+(p.amount||0)},0);
-                var due = (b.balanceDue||0) - exPay;
-                return due > 0.01;
-              }).sort(function(a,b){return new Date(a.date)-new Date(b.date)}); // oldest first
-              
+                return (b.balanceDue||0) - exPay > 0.01;
+              }).sort(function(a,b){ return new Date(a.date)-new Date(b.date); });
+
+              var creditRemaining = amt;
+
+              // Step 2: Apply payment to each unpaid bill oldest-first
               for(var ubi=0; ubi<unpaidBills.length && creditRemaining>0.01; ubi++){
                 var ubill = unpaidBills[ubi];
                 var uref = db.doc(userPath()+'/bills/'+ubill._id);
@@ -5405,27 +5414,36 @@
                 var uep = (udata.extraPayments||[]);
                 var totalUep = uep.reduce(function(s,p){return s+(p.amount||0)},0);
                 var udue = (udata.balanceDue||0) - totalUep;
-                
                 if(udue > 0.01){
                   var payAmt = Math.min(creditRemaining, udue);
-                  uep.push({amount:payAmt, date:dt||new Date().toISOString().slice(0,10), fromCredit:true});
-                  var newTotalUep = totalUep + payAmt;
-                  var newRemaining = (udata.balanceDue||0) - newTotalUep;
+                  uep.push({amount:payAmt, date:payDate, fromCredit:true});
                   var uupdates = {extraPayments:uep};
+                  var newRemaining = udue - payAmt;
                   if(newRemaining <= 0.01){
                     uupdates.paymentStatus = 'received';
                     uupdates.balanceDue = 0;
                   } else {
                     uupdates.paymentStatus = 'partial';
+                    uupdates.balanceDue = newRemaining;
                   }
                   await trackedWrite(function(){return uref.update(uupdates)});
+                  // Update local state immediately
+                  var lb2=state.bills.find(function(bb){return bb._id===ubill._id});
+                  if(lb2){lb2.extraPayments=uep;lb2.paymentStatus=uupdates.paymentStatus;lb2.balanceDue=uupdates.balanceDue!==undefined?uupdates.balanceDue:lb2.balanceDue;}
                   creditRemaining -= payAmt;
                 }
               }
-            } else {
-              // No real bills yet — create a payment-only entry
-              var payBill={companyId:c._id,companyName:c.name,date:(function(){var dp=document.getElementById('billDatePicker');return dp&&dp.value?new Date(dp.value).toISOString():new Date().toISOString()})(),convMode:'pts2dollar',items:[],totalDollars:0,totalPoints:0,paymentStatus:'received',partialAmount:0,balanceDue:0,extraPayments:[{amount:amt,date:dt||new Date().toISOString().slice(0,10),isGeneral:true}]};
-              await trackedWrite(function(){return db.collection(userPath()+'/bills').add(payBill)});
+
+              // Step 3: Store any remaining amount as credit on the latest bill
+              if(creditRemaining > 0.01){
+                var ref2=db.doc(userPath()+'/bills/'+latestBill._id);
+                var sn2=await ref2.get();
+                var ep2=(sn2.data().extraPayments||[]);
+                ep2.push({amount:creditRemaining, date:payDate, isGeneral:true});
+                await trackedWrite(function(){return ref2.update({extraPayments:ep2})});
+                var lb3=state.bills.find(function(bb){return bb._id===latestBill._id});
+                if(lb3){lb3.extraPayments=ep2;}
+              }
             }
           } else {
             var ref=db.doc(userPath()+'/bills/'+bid);var sn=await ref.get();var bData=sn.data();var ep=(bData.extraPayments||[]);ep.push({amount:amt,date:dt||new Date().toISOString().slice(0,10)});
