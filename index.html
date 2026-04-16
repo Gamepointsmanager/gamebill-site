@@ -3470,8 +3470,6 @@
       // Rebuild liveFeeCredit section
       var fcEl=document.getElementById('liveFeeCredit');
       if(!fcEl)return;
-      var pendingDue = getCompanyOutstandingBalance(c);
-      var totalBalDue = s.amountDue + pendingDue;
       var h='';
       if(ef>0)h+='<div style="display:flex;justify-content:space-between;padding:6px 10px;border-radius:8px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.15);margin-bottom:6px;font-size:12px"><span style="color:#fbbf24;font-weight:700">Extra Fee ('+c.extraFeePercent+'%)</span><span style="color:#fbbf24;font-weight:700">$'+fmtDol(ef)+'</span></div>';
       if(ef>0||cr>0)h+='<div style="display:flex;justify-content:space-between;padding:6px 10px;font-size:13px;font-weight:700;color:var(--purpleLight);margin-bottom:6px"><span>GRAND TOTAL</span><span>$'+fmtDol(gt)+'</span></div>';
@@ -3486,10 +3484,12 @@
         if(s.remainingCredit>0&&s.extraPayment===0)h+='<div style="display:flex;justify-content:space-between;padding:4px 10px;font-size:11px;margin-bottom:4px"><span style="color:var(--textMuted)">Remaining Credit</span><span style="color:#34d399">$'+fmtDol(s.remainingCredit)+'</span></div>';
       }
       if(s.extraPayment>0)h+='<div style="display:flex;justify-content:space-between;padding:6px 10px;border-radius:8px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.15);margin-bottom:6px;font-size:12px"><span style="color:#34d399;font-weight:700">Extra Payment → Credit</span><span style="color:#34d399;font-weight:700">+$'+fmtDol(s.extraPayment)+'</span></div>';
-      h+='<div style="display:flex;justify-content:space-between;padding:8px 12px;font-size:14px;font-weight:800;color:#fff;border-radius:10px;background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.25);margin-bottom:'+(td>0&&pendingDue>0.001?'4':'10')+'px"><span style="font-family:Orbitron,monospace;font-size:12px;letter-spacing:1px">AMOUNT DUE</span><span id="liveAmountDue" style="font-family:Orbitron,monospace">$'+fmtDol(s.amountDue)+'</span></div>';
-      if(td>0&&pendingDue>0.001){
-        h+='<div style="display:flex;justify-content:space-between;padding:3px 12px;font-size:11px;color:var(--textMuted);margin-bottom:3px"><span>+ Pending Due (prior bills)</span><span>$'+fmtDol(pendingDue)+'</span></div>';
-        h+='<div style="display:flex;justify-content:space-between;padding:7px 12px;font-size:13px;font-weight:800;color:#f87171;border-radius:9px;background:rgba(220,38,38,0.07);border:1px solid rgba(220,38,38,0.18);margin-bottom:10px"><span style="font-family:Orbitron,monospace;font-size:11px;letter-spacing:1px">TOTAL BALANCE DUE</span><span id="liveTotalBalDue" style="font-family:Orbitron,monospace">$'+fmtDol(totalBalDue)+'</span></div>';
+      var _dynPending = getCompanyOutstandingBalance(c);
+      var _dynTotalBal = s.amountDue + _dynPending;
+      h+='<div style="display:flex;justify-content:space-between;padding:8px 12px;font-size:14px;font-weight:800;color:#fff;border-radius:10px;background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.25);margin-bottom:'+(td>0&&_dynPending>0.001?'4':'10')+'px"><span style="font-family:Orbitron,monospace;font-size:12px;letter-spacing:1px">AMOUNT DUE</span><span id="liveAmountDue" style="font-family:Orbitron,monospace">$'+fmtDol(s.amountDue)+'</span></div>';
+      if(td>0&&_dynPending>0.001){
+        h+='<div style="display:flex;justify-content:space-between;padding:3px 12px;font-size:11px;color:var(--textMuted);margin-bottom:3px"><span>+ Pending Due (prior bills)</span><span>$'+fmtDol(_dynPending)+'</span></div>';
+        h+='<div style="display:flex;justify-content:space-between;padding:7px 12px;font-size:13px;font-weight:800;color:#f87171;border-radius:9px;background:rgba(220,38,38,0.07);border:1px solid rgba(220,38,38,0.18);margin-bottom:10px"><span style="font-family:Orbitron,monospace;font-size:11px;letter-spacing:1px">TOTAL BALANCE DUE</span><span id="liveTotalBalDue" style="font-family:Orbitron,monospace">$'+fmtDol(_dynTotalBal)+'</span></div>';
       }
       fcEl.innerHTML=h;
     }
@@ -3790,7 +3790,7 @@
               }
             }
             // Save bill to Firestore — listener will update state.bills
-            await db.collection(userPath()+'/bills').add(bill);
+            const _newBillRef = await db.collection(userPath()+'/bills').add(bill);
             // If credit was applied, reduce company creditBalance
             if(bill.creditApplied > 0){
               var prevCrBal = typeof c.creditBalance==='number' ? c.creditBalance : getCompanyCreditBalance(c);
@@ -3798,16 +3798,31 @@
               await db.doc(userPath()+'/companies/'+c._id).update({creditBalance:newCrBal});
               if(state.companies[c._id]) state.companies[c._id].creditBalance = newCrBal;
             }
-            // If there is an extra payment (overpayment), apply it to legacy due bills first,
-            // then the remainder becomes company credit.
+            // If there is an overpayment (extra payment), apply it to legacy due bills first.
+            // We also correct the new bill's partialAmount and extraPayments so analytics
+            // counts correctly without double-counting:
+            //   new bill partialAmount = its own grandTotal (not the full cash input)
+            //   legacy bill partialAmount = what it actually received (already set by applyExtraPaymentToLegacyBills)
+            //   isCredit:true entry on new bill = the true leftover after all dues are cleared
             if(bill.extraPayments && bill.extraPayments.length > 0) {
               var _epTotal = bill.extraPayments.reduce(function(s,p){return s+(p.amount||0)},0);
               if(_epTotal > 0.001) {
                 var _epDate = bill.extraPayments[0].date || new Date().toISOString().slice(0,10);
-                var _epLeftover = await applyExtraPaymentToLegacyBills(c, _epTotal, _epDate);
-                // Update company credit with whatever is left after clearing legacy bills
+                // Clear legacy bills; returns true credit leftover after all dues settled
+                var _trueCreditLeftover = await applyExtraPaymentToLegacyBills(c, _epTotal, _epDate);
+                // Correct the new bill:
+                //  - partialAmount = grandTotal only (so bPaid counts exactly what this bill received)
+                //  - extraPayments = [{isCredit:true, amount: leftover}] only if leftover > 0
+                var _correctedEps = _trueCreditLeftover > 0.001
+                  ? [{ amount: parseFloat(_trueCreditLeftover.toFixed(2)), date: _epDate, isCredit: true }]
+                  : [];
+                var _correctedPartial = parseFloat((bill.totalDollars + (bill.extraFeeAmount||0)).toFixed(2));
+                await trackedWrite(function(){
+                  return _newBillRef.update({ extraPayments: _correctedEps, partialAmount: _correctedPartial });
+                });
+                // Add only the true leftover credit to company balance
                 var _curCr = typeof c.creditBalance==='number' ? c.creditBalance : 0;
-                var _newCr = parseFloat((Math.max(0, _curCr) + _epLeftover).toFixed(2));
+                var _newCr = parseFloat((_curCr + _trueCreditLeftover).toFixed(2));
                 await db.doc(userPath()+'/companies/'+c._id).update({creditBalance:_newCr});
                 if(state.companies[c._id]) state.companies[c._id].creditBalance = _newCr;
               }
@@ -4298,11 +4313,10 @@
         </div>`;
       }
       summaryRowsHTML += `<div style="height:1px;background:#e5e7eb;margin-top:4px"></div>`;
-      // Compute pending due from other outstanding bills (single/live invoice only)
+      // For single-bill or live-bill invoices, show prior outstanding and total balance due
       const _invPendingDue = getCompanyOutstandingBalance(comp);
       const _isSingleOrLive = isLiveBill || (singleBill != null) || (billsOverride && billsOverride.length === 1);
       const _showPending = _invPendingDue > 0.001 && _isSingleOrLive;
-      const _totalBalDueInv = totalBalance + (_showPending ? _invPendingDue : 0);
       // Only show balance due if there's actually a balance
       if (totalBalance > 0.001) {
         summaryRowsHTML += `<div style="display:flex;justify-content:space-between;padding:4px 0">
@@ -4322,7 +4336,7 @@
         </div>`;
         summaryRowsHTML += `<div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid #fee2e2;margin-top:2px">
           <span style="font-size:13px;font-weight:700;color:#b91c1c">Total Balance Due</span>
-          <span style="font-size:14px;font-weight:800;color:#b91c1c">$${fmtDol(_totalBalDueInv)}</span>
+          <span style="font-size:14px;font-weight:800;color:#b91c1c">$${fmtDol(totalBalance + _invPendingDue)}</span>
         </div>`;
       }
       if (summaryRemainingCredit > 0) {
@@ -4472,10 +4486,11 @@
         .reduce(function(sum, b) { return sum + Math.max(0, b.balanceDue || 0); }, 0);
     }
 
-    // Apply an overpayment/extra-payment amount to legacy due bills for a company, oldest-first.
-    // Returns the leftover amount (the true credit after clearing all due bills).
-    // Also updates Firestore and local state for each cleared bill.
-    // payDate: ISO date string for payment record.
+    // Apply an overpayment amount to legacy due bills (oldest-first).
+    // Updates balanceDue + paymentStatus + partialAmount on each cleared bill.
+    // IMPORTANT: does NOT push any extraPayments entry onto the cleared bill —
+    // the partialAmount/paymentStatus update is the authoritative record for analytics.
+    // Returns the leftover amount that becomes true credit after all dues are cleared.
     async function applyExtraPaymentToLegacyBills(c, extraAmt, payDate) {
       if (!extraAmt || extraAmt <= 0.001) return extraAmt;
       var unpaid = state.bills
@@ -4491,12 +4506,12 @@
         var applyAmt = parseFloat(Math.min(remaining, uDue).toFixed(2));
         var newDue = parseFloat((uDue - applyAmt).toFixed(2));
         var gt = (ud.totalDollars || 0) + (ud.extraFeeAmount || 0);
-        var ueps = (ud.extraPayments || []).concat([{ amount: applyAmt, date: payDate, isGeneral: true }]);
+        // Update the bill's status and amounts — no extraPayments entry added here.
+        // The partialAmount update is what analytics uses to count received cash on this bill.
         var uup = {
           balanceDue: newDue,
           paymentStatus: newDue <= 0.001 ? 'received' : 'partial',
-          partialAmount: parseFloat((gt - newDue).toFixed(2)),
-          extraPayments: ueps
+          partialAmount: parseFloat((gt - newDue).toFixed(2))
         };
         await trackedWrite(function() { return uref.update(uup); });
         var lb = state.bills.find(function(b) { return b._id === ub._id; });
@@ -4504,7 +4519,7 @@
         remaining -= applyAmt;
         remaining = parseFloat(Math.max(0, remaining).toFixed(2));
       }
-      return remaining; // leftover = true credit
+      return remaining; // leftover = true credit after all dues cleared
     }
 
     function getCompanyCreditBalance(c) {
@@ -5109,15 +5124,16 @@
         var bPaid = bill.paymentStatus==='received'
           ? Math.max(0, bFull - _bCredit)
           : (bill.paymentStatus==='partial' ? Math.max(0, (bill.partialAmount||0) - _bCredit) : 0);
-        // Real extra payments recorded on this bill (payment history, NOT used for balance math)
+        // Count received cash for this bill.
+        // Rule: bPaid (from partialAmount) covers all cash applied directly to this bill's balance.
+        //       extraPayments with isCredit:true are standalone credit additions (cash not tied to
+        //       any bill's balance) — count those once here on the bill that holds the entry.
+        //       All other extraPayments entries are either display-only history or already counted
+        //       via bPaid, so skip them to avoid double-counting.
         var exReal=0, exs=bill.extraPayments||[];
         for(var ei=0;ei<exs.length;ei++){
-          // Only count real external money — skip fromCredit (legacy internal transfers)
-          // isGeneral WITHOUT isCredit = bill-clearing portion already counted via bPaid — skip to avoid double-count
-          // isGeneral WITH isCredit = credit leftover from a general payment (real cash, not yet in bPaid) — count it
           var ep=exs[ei];
-          if(ep.fromCredit) continue;
-          if(ep.isGeneral && !ep.isCredit) continue;
+          if(!ep.isCredit) continue; // skip everything except standalone credit additions
           exReal += (ep.amount||0);
         }
         var thisRec = bPaid + exReal; tRec += thisRec;
@@ -5529,7 +5545,11 @@
             } else {
               var remaining = amt;
 
-              // Apply payment to each unpaid bill oldest-first
+              // Apply payment to each unpaid bill oldest-first.
+              // Only update balanceDue / paymentStatus / partialAmount — do NOT push any
+              // extraPayments entry on the cleared bill.  Analytics counts the payment via
+              // the updated partialAmount (bPaid), so no extra entry is needed and none
+              // would cause a double-count.
               for(var ubi=0; ubi<unpaidBills.length && remaining>0.001; ubi++){
                 var ubill = unpaidBills[ubi];
                 // Fetch fresh from Firestore to avoid stale data
@@ -5545,10 +5565,7 @@
                 // partialAmount = total actually paid toward this bill's grand total
                 var grandTotal = (udata.totalDollars||0)+(udata.extraFeeAmount||0);
                 uupdates.partialAmount = parseFloat((grandTotal - newDue).toFixed(2));
-                // Store payment record for history display
-                var uep = (udata.extraPayments||[]);
-                uep.push({amount:parseFloat(applyAmt.toFixed(2)), date:payDate, isGeneral:true});
-                uupdates.extraPayments = uep;
+                // No extraPayments push here — partialAmount is the authoritative record
 
                 await trackedWrite(function(){return uref.update(uupdates)});
                 // Update local state immediately
@@ -5562,14 +5579,15 @@
               var prevCredit = typeof c.creditBalance==='number' ? c.creditBalance : 0;
               var totalCredit = parseFloat((prevCredit + newCredit).toFixed(2));
 
-              // If there's leftover credit, record it on the newest bill for visibility
+              // Record the credit portion on the newest bill for visibility in payment history.
+              // isCredit:true marks this as a standalone credit addition (not a bill payment),
+              // so analytics correctly adds it to totalReceived without double-counting.
               if(newCredit > 0.001){
-                var newestBill = allCompBills[allCompBills.length-1]; // oldest-first sorted, so last = newest
-                // Actually we sorted oldest-first, newest is last element
+                var newestBill = allCompBills[allCompBills.length-1];
                 var nbRef = db.doc(userPath()+'/bills/'+newestBill._id);
                 var nbSnap = await nbRef.get(); var nbData = nbSnap.data();
                 var nbEp = (nbData.extraPayments||[]);
-                nbEp.push({amount:newCredit, date:payDate, isGeneral:true, isCredit:true});
+                nbEp.push({amount:newCredit, date:payDate, isCredit:true});
                 await trackedWrite(function(){return nbRef.update({extraPayments:nbEp})});
                 var lbN=state.bills.find(function(bb){return bb._id===newestBill._id});
                 if(lbN){lbN.extraPayments=nbEp;}
