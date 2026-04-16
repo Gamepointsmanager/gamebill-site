@@ -3186,17 +3186,18 @@
             var _applyCredit=state.paymentStatus!=='received';
             var _cash=state.paymentStatus==='received'?_gt:state.paymentStatus==='partial'?(parseFloat(state.partialAmount)||0):0;
             var _s=calcSettlement(_gt,_cash,_cr,_applyCredit);
+            var _pendingDue=getCompanyOutstandingBalance(c);
+            var _totalBalDue=_s.amountDue+_pendingDue;
             var _o='';
             if(_ef>0){_o+='<div style="display:flex;justify-content:space-between;padding:6px 10px;border-radius:8px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.15);margin-bottom:6px;font-size:12px"><span style="color:#fbbf24;font-weight:700">Extra Fee ('+c.extraFeePercent+'%)</span><span style="color:#fbbf24;font-weight:700">$'+fmtDol(_ef)+'</span></div>';}
             if(_ef>0||_cr>0){_o+='<div style="display:flex;justify-content:space-between;padding:6px 10px;font-size:13px;font-weight:700;color:var(--purpleLight);margin-bottom:6px"><span>GRAND TOTAL</span><span>$'+fmtDol(_gt)+'</span></div>';}
             if(_cr>0&&totalDollars===0){_o+='<div style="display:flex;justify-content:space-between;padding:6px 10px;border-radius:8px;background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.2);margin-bottom:6px;font-size:12px"><span style="color:#34d399;font-weight:600">Available Credit</span><span style="color:#34d399;font-weight:700">$'+fmtDol(_cr)+'</span></div>';}
             if(_applyCredit&&_s.creditUsed>0&&totalDollars>0){_o+='<div style="display:flex;justify-content:space-between;padding:6px 10px;border-radius:8px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.15);margin-bottom:6px;font-size:12px"><span style="color:#34d399;font-weight:700">Credit Applied</span><span style="color:#34d399;font-weight:700">-$'+fmtDol(_s.creditUsed)+'</span></div>';if(_s.remainingCredit>0&&_s.extraPayment===0)_o+='<div style="display:flex;justify-content:space-between;padding:4px 10px;font-size:11px;margin-bottom:4px"><span style="color:var(--textMuted)">Remaining Credit</span><span style="color:#34d399">$'+fmtDol(_s.remainingCredit)+'</span></div>';}
             if(_s.extraPayment>0){_o+='<div style="display:flex;justify-content:space-between;padding:6px 10px;border-radius:8px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.15);margin-bottom:6px;font-size:12px"><span style="color:#34d399;font-weight:700">Extra Payment \u2192 Credit</span><span style="color:#34d399;font-weight:700">+$'+fmtDol(_s.extraPayment)+'</span></div>';}
-            _o+='<div style="display:flex;justify-content:space-between;padding:8px 12px;font-size:14px;font-weight:800;color:#fff;border-radius:10px;background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.25);margin-bottom:10px"><span style="font-family:Orbitron,monospace;font-size:12px;letter-spacing:1px">AMOUNT DUE</span><span id="liveAmountDue" style="font-family:Orbitron,monospace">$'+fmtDol(_s.amountDue)+'</span></div>';
-            // Show Pending Due only if company has outstanding balance on previous bills
-            var _pendingDue = getCompanyOutstandingBalance(c);
-            if (_pendingDue > 0.001) {
-              _o+='<div style="display:flex;justify-content:space-between;padding:7px 12px;border-radius:9px;background:rgba(220,38,38,0.08);border:1px solid rgba(220,38,38,0.22);margin-bottom:6px;font-size:13px;font-weight:700"><span style="color:#f87171;font-family:Orbitron,monospace;font-size:11px;letter-spacing:1px">PENDING DUE</span><span style="color:#f87171;font-family:Orbitron,monospace">$'+fmtDol(_pendingDue)+'</span></div>';
+            _o+='<div style="display:flex;justify-content:space-between;padding:8px 12px;font-size:14px;font-weight:800;color:#fff;border-radius:10px;background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.25);margin-bottom:'+(totalDollars>0&&_pendingDue>0.001?'4':'10')+'px"><span style="font-family:Orbitron,monospace;font-size:12px;letter-spacing:1px">AMOUNT DUE</span><span id="liveAmountDue" style="font-family:Orbitron,monospace">$'+fmtDol(_s.amountDue)+'</span></div>';
+            if(totalDollars>0&&_pendingDue>0.001){
+              _o+='<div style="display:flex;justify-content:space-between;padding:3px 12px;font-size:11px;color:var(--textMuted);margin-bottom:3px"><span>+ Pending Due (prior bills)</span><span>$'+fmtDol(_pendingDue)+'</span></div>';
+              _o+='<div style="display:flex;justify-content:space-between;padding:7px 12px;font-size:13px;font-weight:800;color:#f87171;border-radius:9px;background:rgba(220,38,38,0.07);border:1px solid rgba(220,38,38,0.18);margin-bottom:10px"><span style="font-family:Orbitron,monospace;font-size:11px;letter-spacing:1px">TOTAL BALANCE DUE</span><span id="liveTotalBalDue" style="font-family:Orbitron,monospace">$'+fmtDol(_totalBalDue)+'</span></div>';
             }
             return _o;
           })()}</div>
@@ -3469,6 +3470,8 @@
       // Rebuild liveFeeCredit section
       var fcEl=document.getElementById('liveFeeCredit');
       if(!fcEl)return;
+      var pendingDue = getCompanyOutstandingBalance(c);
+      var totalBalDue = s.amountDue + pendingDue;
       var h='';
       if(ef>0)h+='<div style="display:flex;justify-content:space-between;padding:6px 10px;border-radius:8px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.15);margin-bottom:6px;font-size:12px"><span style="color:#fbbf24;font-weight:700">Extra Fee ('+c.extraFeePercent+'%)</span><span style="color:#fbbf24;font-weight:700">$'+fmtDol(ef)+'</span></div>';
       if(ef>0||cr>0)h+='<div style="display:flex;justify-content:space-between;padding:6px 10px;font-size:13px;font-weight:700;color:var(--purpleLight);margin-bottom:6px"><span>GRAND TOTAL</span><span>$'+fmtDol(gt)+'</span></div>';
@@ -3483,11 +3486,10 @@
         if(s.remainingCredit>0&&s.extraPayment===0)h+='<div style="display:flex;justify-content:space-between;padding:4px 10px;font-size:11px;margin-bottom:4px"><span style="color:var(--textMuted)">Remaining Credit</span><span style="color:#34d399">$'+fmtDol(s.remainingCredit)+'</span></div>';
       }
       if(s.extraPayment>0)h+='<div style="display:flex;justify-content:space-between;padding:6px 10px;border-radius:8px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.15);margin-bottom:6px;font-size:12px"><span style="color:#34d399;font-weight:700">Extra Payment → Credit</span><span style="color:#34d399;font-weight:700">+$'+fmtDol(s.extraPayment)+'</span></div>';
-      h+='<div style="display:flex;justify-content:space-between;padding:8px 12px;font-size:14px;font-weight:800;color:#fff;border-radius:10px;background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.25);margin-bottom:10px"><span style="font-family:Orbitron,monospace;font-size:12px;letter-spacing:1px">AMOUNT DUE</span><span id="liveAmountDue" style="font-family:Orbitron,monospace">$'+fmtDol(s.amountDue)+'</span></div>';
-      // Show Pending Due only if company has outstanding balance on previous bills
-      var _livePendingDue = getCompanyOutstandingBalance(c);
-      if (_livePendingDue > 0.001) {
-        h+='<div style="display:flex;justify-content:space-between;padding:7px 12px;border-radius:9px;background:rgba(220,38,38,0.08);border:1px solid rgba(220,38,38,0.22);margin-bottom:6px;font-size:13px;font-weight:700"><span style="color:#f87171;font-family:Orbitron,monospace;font-size:11px;letter-spacing:1px">PENDING DUE</span><span style="color:#f87171;font-family:Orbitron,monospace">$'+fmtDol(_livePendingDue)+'</span></div>';
+      h+='<div style="display:flex;justify-content:space-between;padding:8px 12px;font-size:14px;font-weight:800;color:#fff;border-radius:10px;background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.25);margin-bottom:'+(td>0&&pendingDue>0.001?'4':'10')+'px"><span style="font-family:Orbitron,monospace;font-size:12px;letter-spacing:1px">AMOUNT DUE</span><span id="liveAmountDue" style="font-family:Orbitron,monospace">$'+fmtDol(s.amountDue)+'</span></div>';
+      if(td>0&&pendingDue>0.001){
+        h+='<div style="display:flex;justify-content:space-between;padding:3px 12px;font-size:11px;color:var(--textMuted);margin-bottom:3px"><span>+ Pending Due (prior bills)</span><span>$'+fmtDol(pendingDue)+'</span></div>';
+        h+='<div style="display:flex;justify-content:space-between;padding:7px 12px;font-size:13px;font-weight:800;color:#f87171;border-radius:9px;background:rgba(220,38,38,0.07);border:1px solid rgba(220,38,38,0.18);margin-bottom:10px"><span style="font-family:Orbitron,monospace;font-size:11px;letter-spacing:1px">TOTAL BALANCE DUE</span><span id="liveTotalBalDue" style="font-family:Orbitron,monospace">$'+fmtDol(totalBalDue)+'</span></div>';
       }
       fcEl.innerHTML=h;
     }
@@ -3795,6 +3797,20 @@
               var newCrBal = parseFloat(Math.max(0, prevCrBal - bill.creditApplied).toFixed(2));
               await db.doc(userPath()+'/companies/'+c._id).update({creditBalance:newCrBal});
               if(state.companies[c._id]) state.companies[c._id].creditBalance = newCrBal;
+            }
+            // If there is an extra payment (overpayment), apply it to legacy due bills first,
+            // then the remainder becomes company credit.
+            if(bill.extraPayments && bill.extraPayments.length > 0) {
+              var _epTotal = bill.extraPayments.reduce(function(s,p){return s+(p.amount||0)},0);
+              if(_epTotal > 0.001) {
+                var _epDate = bill.extraPayments[0].date || new Date().toISOString().slice(0,10);
+                var _epLeftover = await applyExtraPaymentToLegacyBills(c, _epTotal, _epDate);
+                // Update company credit with whatever is left after clearing legacy bills
+                var _curCr = typeof c.creditBalance==='number' ? c.creditBalance : 0;
+                var _newCr = parseFloat((Math.max(0, _curCr) + _epLeftover).toFixed(2));
+                await db.doc(userPath()+'/companies/'+c._id).update({creditBalance:_newCr});
+                if(state.companies[c._id]) state.companies[c._id].creditBalance = _newCr;
+              }
             }
             touchCompany(c._id);
             _lastSyncedTime = new Date();
@@ -4282,10 +4298,15 @@
         </div>`;
       }
       summaryRowsHTML += `<div style="height:1px;background:#e5e7eb;margin-top:4px"></div>`;
+      // Compute pending due from other outstanding bills (single/live invoice only)
+      const _invPendingDue = getCompanyOutstandingBalance(comp);
+      const _isSingleOrLive = isLiveBill || (singleBill != null) || (billsOverride && billsOverride.length === 1);
+      const _showPending = _invPendingDue > 0.001 && _isSingleOrLive;
+      const _totalBalDueInv = totalBalance + (_showPending ? _invPendingDue : 0);
       // Only show balance due if there's actually a balance
       if (totalBalance > 0.001) {
         summaryRowsHTML += `<div style="display:flex;justify-content:space-between;padding:4px 0">
-          <span style="font-size:14px;font-weight:700;color:#111827">Balance Due</span>
+          <span style="font-size:14px;font-weight:700;color:#111827">${_showPending ? 'This Bill Due' : 'Balance Due'}</span>
           <span style="font-size:16px;font-weight:800;color:#dc2626">$${fmtDol(totalBalance)}</span>
         </div>`;
       } else {
@@ -4294,20 +4315,20 @@
           <span style="font-size:16px;font-weight:800;color:#059669">$${fmtDol(0)}</span>
         </div>`;
       }
+      if (_showPending) {
+        summaryRowsHTML += `<div style="display:flex;justify-content:space-between;padding:2px 0">
+          <span style="font-size:12px;color:#6b7280">+ Prior Outstanding</span>
+          <span style="font-size:12px;font-weight:600;color:#6b7280">$${fmtDol(_invPendingDue)}</span>
+        </div>`;
+        summaryRowsHTML += `<div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid #fee2e2;margin-top:2px">
+          <span style="font-size:13px;font-weight:700;color:#b91c1c">Total Balance Due</span>
+          <span style="font-size:14px;font-weight:800;color:#b91c1c">$${fmtDol(_totalBalDueInv)}</span>
+        </div>`;
+      }
       if (summaryRemainingCredit > 0) {
         summaryRowsHTML += `<div style="display:flex;justify-content:space-between;padding:6px 0 2px;border-top:1px dashed #bfdbfe;margin-top:4px">
           <span style="font-size:12px;color:#2563eb;font-weight:600">Remaining Credit</span>
           <span style="font-size:13px;font-weight:800;color:#2563eb">$${fmtDol(summaryRemainingCredit)}</span>
-        </div>`;
-      }
-      // Pending Due: total outstanding across all saved bills for this company.
-      // Only shown when the company has outstanding balance and this is a single-bill or live-bill invoice.
-      const _invPendingDue = getCompanyOutstandingBalance(comp);
-      const _isSingleOrLive = isLiveBill || (singleBill != null) || (billsOverride && billsOverride.length === 1);
-      if (_invPendingDue > 0.001 && _isSingleOrLive) {
-        summaryRowsHTML += `<div style="display:flex;justify-content:space-between;padding:6px 8px;border-radius:8px;background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.18);margin-top:6px">
-          <span style="font-size:12px;color:#dc2626;font-weight:700;letter-spacing:0.5px;text-transform:uppercase">Pending Due (Total Outstanding)</span>
-          <span style="font-size:13px;font-weight:800;color:#dc2626">$${fmtDol(_invPendingDue)}</span>
         </div>`;
       }
 
@@ -4445,11 +4466,45 @@
     // We keep it simple: creditBalance is stored directly on the company document.
     // ============================================================
     // Returns the total outstanding balance (sum of balanceDue) across ALL saved bills for a company.
-    // Used to show "Pending Due" in the live bill panel, copied bills, and individual invoices.
     function getCompanyOutstandingBalance(c) {
       return state.bills
         .filter(function(b) { return b.companyId === c._id; })
         .reduce(function(sum, b) { return sum + Math.max(0, b.balanceDue || 0); }, 0);
+    }
+
+    // Apply an overpayment/extra-payment amount to legacy due bills for a company, oldest-first.
+    // Returns the leftover amount (the true credit after clearing all due bills).
+    // Also updates Firestore and local state for each cleared bill.
+    // payDate: ISO date string for payment record.
+    async function applyExtraPaymentToLegacyBills(c, extraAmt, payDate) {
+      if (!extraAmt || extraAmt <= 0.001) return extraAmt;
+      var unpaid = state.bills
+        .filter(function(b) { return b.companyId === c._id && (b.balanceDue || 0) > 0.01; })
+        .sort(function(a, b) { return toLocalDate(a.date) - toLocalDate(b.date); });
+      var remaining = extraAmt;
+      for (var i = 0; i < unpaid.length && remaining > 0.001; i++) {
+        var ub = unpaid[i];
+        var uref = db.doc(userPath() + '/bills/' + ub._id);
+        var usn = await uref.get(); var ud = usn.data();
+        var uDue = ud.balanceDue || 0;
+        if (uDue <= 0.001) continue;
+        var applyAmt = parseFloat(Math.min(remaining, uDue).toFixed(2));
+        var newDue = parseFloat((uDue - applyAmt).toFixed(2));
+        var gt = (ud.totalDollars || 0) + (ud.extraFeeAmount || 0);
+        var ueps = (ud.extraPayments || []).concat([{ amount: applyAmt, date: payDate, isGeneral: true }]);
+        var uup = {
+          balanceDue: newDue,
+          paymentStatus: newDue <= 0.001 ? 'received' : 'partial',
+          partialAmount: parseFloat((gt - newDue).toFixed(2)),
+          extraPayments: ueps
+        };
+        await trackedWrite(function() { return uref.update(uup); });
+        var lb = state.bills.find(function(b) { return b._id === ub._id; });
+        if (lb) Object.assign(lb, uup);
+        remaining -= applyAmt;
+        remaining = parseFloat(Math.max(0, remaining).toFixed(2));
+      }
+      return remaining; // leftover = true credit
     }
 
     function getCompanyCreditBalance(c) {
@@ -4522,10 +4577,10 @@
       }
       lines.push('');
       lines.push('Amount Due: $' + fmtDol(s.amountDue));
-      // Append total outstanding from all previously saved bills (only if > 0)
-      var _textPendingDue = getCompanyOutstandingBalance(c);
-      if (_textPendingDue > 0.001) {
-        lines.push('Pending Due (Total Outstanding): $' + fmtDol(_textPendingDue));
+      var _copyPendingDue = getCompanyOutstandingBalance(c);
+      if (_copyPendingDue > 0.001) {
+        lines.push('Prior Outstanding: $' + fmtDol(_copyPendingDue));
+        lines.push('Total Balance Due: $' + fmtDol(s.amountDue + _copyPendingDue));
       }
       return lines.join('\n');
     }
@@ -5058,10 +5113,11 @@
         var exReal=0, exs=bill.extraPayments||[];
         for(var ei=0;ei<exs.length;ei++){
           // Only count real external money — skip fromCredit (legacy internal transfers)
-          // and isGeneral entries whose purpose is only credit storage (already counted via bPaid on cleared bills)
+          // isGeneral WITHOUT isCredit = bill-clearing portion already counted via bPaid — skip to avoid double-count
+          // isGeneral WITH isCredit = credit leftover from a general payment (real cash, not yet in bPaid) — count it
           var ep=exs[ei];
           if(ep.fromCredit) continue;
-          if(ep.isGeneral) continue; // isGeneral = general company payment, counted via cleared bills' bPaid
+          if(ep.isGeneral && !ep.isCredit) continue;
           exReal += (ep.amount||0);
         }
         var thisRec = bPaid + exReal; tRec += thisRec;
@@ -6195,10 +6251,10 @@
         if(remainCr>0) lines.push('Remaining Credit: $'+fmtDol(remainCr));
         lines.push('');
         lines.push('Amount Due: $'+fmtDol(bDue));
-        // Append total outstanding from ALL company bills (only for companies with outstanding balance)
-        var _histCopyPendingDue = getCompanyOutstandingBalance(comp);
-        if (_histCopyPendingDue > 0.001) {
-          lines.push('Pending Due (Total Outstanding): $'+fmtDol(_histCopyPendingDue));
+        var _histCopyPending = getCompanyOutstandingBalance(comp);
+        if (_histCopyPending > 0.001) {
+          lines.push('Prior Outstanding: $'+fmtDol(_histCopyPending));
+          lines.push('Total Balance Due: $'+fmtDol(bDue + _histCopyPending));
         }
         var text = lines.join('\n');
         navigator.clipboard.writeText(text).then(function(){
