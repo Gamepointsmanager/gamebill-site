@@ -4625,6 +4625,12 @@
       if (state.paymentStatus === 'received') cashReceived = grandTotal;
       else if (state.paymentStatus === 'partial') cashReceived = parseFloat(state.partialAmount) || 0;
       var s = calcSettlement(grandTotal, cashReceived, credit, applyCredit);
+      // Resolve bill date first — needed by extraPayments and reference number
+      var _pickerEl = document.getElementById('billDatePicker');
+      var _pickerVal = _pickerEl ? _pickerEl.value : '';
+      var _pickerDate = _pickerVal ? new Date(_pickerVal) : null;
+      const billDate = state.billDateOverride || (_pickerDate && !isNaN(_pickerDate) ? _pickerDate.toISOString() : new Date().toISOString());
+
       // Build extraPayments array for overpayment → credit
       var extraPaymentsArr = [];
       if (s.extraPayment > 0) {
@@ -4643,12 +4649,6 @@
       else { savedPartialAmount = s.creditUsed + cashReceived; }
       
       // Generate reference number
-      // Read date: prefer state.billDateOverride (set by onchange), fallback to reading picker directly
-      var _pickerEl = document.getElementById('billDatePicker');
-      var _pickerVal = _pickerEl ? _pickerEl.value : '';
-      var _pickerDate = _pickerVal ? new Date(_pickerVal) : null;
-      // Use state.billDateOverride if set, else picker DOM value, else current time
-      const billDate = state.billDateOverride || (_pickerDate && !isNaN(_pickerDate) ? _pickerDate.toISOString() : new Date().toISOString());
       const companyCode = c.companyCode || await generateCompanyCode();
       const referenceNumber = await generateReferenceNumber(companyCode, billDate);
       
