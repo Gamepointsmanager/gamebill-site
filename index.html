@@ -5548,26 +5548,29 @@
               // extraPayments entry on the cleared bill.  Analytics counts the payment via
               // the updated partialAmount (bPaid), so no extra entry is needed and none
               // would cause a double-count.
-              for(var ubi=0; ubi<unpaidBills.length && remaining>0.001; ubi++){
-                var ubill = unpaidBills[ubi];
+              for(let ubi=0; ubi<unpaidBills.length && remaining>0.001; ubi++){
+                let ubill = unpaidBills[ubi];
                 // Fetch fresh from Firestore to avoid stale data
-                var uref = db.doc(userPath()+'/bills/'+ubill._id);
-                var usn = await uref.get(); var udata = usn.data();
-                var uDue = udata.balanceDue||0;
+                let uref = db.doc(userPath()+'/bills/'+ubill._id);
+                let usn = await uref.get(); let udata = usn.data();
+                let uDue = udata.balanceDue||0;
                 if(uDue <= 0.001) continue;
 
-                var applyAmt = Math.min(remaining, uDue);
-                var newDue = parseFloat((uDue - applyAmt).toFixed(2));
-                var uupdates = { balanceDue: newDue };
+                let applyAmt = Math.min(remaining, uDue);
+                let newDue = parseFloat((uDue - applyAmt).toFixed(2));
+                let uupdates = { balanceDue: newDue };
                 uupdates.paymentStatus = newDue <= 0.001 ? 'received' : 'partial';
                 // partialAmount = total actually paid toward this bill's grand total
-                var grandTotal = (udata.totalDollars||0)+(udata.extraFeeAmount||0);
+                let grandTotal = (udata.totalDollars||0)+(udata.extraFeeAmount||0);
                 uupdates.partialAmount = parseFloat((grandTotal - newDue).toFixed(2));
-                // No extraPayments push here — partialAmount is the authoritative record
+                // Push an extraPayments record so this payment is visible in history
+                let existingEps = udata.extraPayments || [];
+                existingEps.push({ amount: parseFloat(applyAmt.toFixed(2)), date: payDate, isGeneral: true });
+                uupdates.extraPayments = existingEps;
 
                 await trackedWrite(function(){return uref.update(uupdates)});
                 // Update local state immediately
-                var lbU=state.bills.find(function(bb){return bb._id===ubill._id});
+                let lbU=state.bills.find(function(bb){return bb._id===ubill._id});
                 if(lbU){Object.assign(lbU,uupdates);}
                 remaining -= applyAmt;
               }
