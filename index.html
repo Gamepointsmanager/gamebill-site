@@ -4228,17 +4228,25 @@
           const ef = b.extraFeeAmount || 0;
           const cr = b.creditApplied || 0;
           const gt = (b.totalDollars||0) + ef;
-          // Only count isCredit:true extraPayments (standalone credit additions not tied to bill balance).
-          // isGeneral:true and plain extraPayments are already reflected in partialAmount/savedCash.
-          const ex = (b.extraPayments||[]).reduce((s,p)=>s+((p.isCredit&&!p.isGeneral)?(p.amount||0):0),0);
-          // For "received" status, the customer paid the full amount (credit was applied as part of payment)
-          var savedCash = b.paymentStatus==='received' ? gt
-            : b.paymentStatus==='partial' ? (b.partialAmount||0)
+          // ── Exact same formula as computeAnalyticsData (payment received summary card) ──
+          // Cash paid = what was actually received in cash (partialAmount minus credit portion).
+          // creditApplied is pre-paid credit, not new cash, so subtract it out.
+          const bPaid = b.paymentStatus==='received'
+            ? Math.max(0, gt - cr)
+            : b.paymentStatus==='partial' ? Math.max(0, (b.partialAmount||0) - cr)
             : 0;
+          // Extra cash: isCredit:true entries = standalone credit additions (real cash, stored on bill).
+          // isGeneral:true on a holder bill (no items, totalDollars=0) = the only record of a payment.
+          const _isHolder = (b.totalDollars||0) === 0 && (b.totalPoints||0) === 0;
+          const exReal = (b.extraPayments||[]).reduce((s,p) => {
+            if (p.isCredit) return s + (p.amount||0);
+            if (p.isGeneral && _isHolder) return s + (p.amount||0);
+            return s;
+          }, 0);
           grandTotal         += gt;
           summaryExtraFee    += ef;
           summaryTotalCredit += cr;
-          totalReceived      += savedCash + ex;
+          totalReceived      += bPaid + exReal;
           totalBalance       += Math.max(0, b.balanceDue||0);
         });
         // Remaining credit = current live balance (what's still available after all bills)
@@ -5527,24 +5535,29 @@
       _allBillsSorted.forEach(function(b){
         var bFull=(b.totalDollars||0)+(b.extraFeeAmount||0);
         var eps=b.extraPayments||[];
+        // Sum of isGeneral payments on this bill — these are general pool payments already shown as their own events
+        var generalOnBill = eps.reduce(function(s,ep){ return ep.isGeneral ? s+(ep.amount||0) : s; }, 0);
         // General payments on this bill (isGeneral:true) — show each as its own received entry
         eps.forEach(function(ep,epi){
           if(ep.isGeneral){
             hist.push({kind:'general',date:ep.date||b.date,amount:ep.amount||0,billId:b._id,payIdx:epi});
           } else if(ep.isCredit){
             hist.push({kind:'credit',date:ep.date||b.date,amount:ep.amount||0,billId:b._id,payIdx:epi});
-          }
-          // plain extraPayments (specific-bill overpayments, legacy) shown as general
-          else {
+          } else {
+            // plain extraPayment on a specific bill (legacy overpayment)
             hist.push({kind:'general',date:ep.date||b.date,amount:ep.amount||0,billId:b._id,payIdx:epi});
           }
         });
-        // Bill payment rows — only for bills that have actual cash paid (not purely credit-paid)
-        var cashPaid=Math.max(0,(b.paymentStatus==='received'?bFull:(b.paymentStatus==='partial'?(b.partialAmount||0):0))-(b.creditApplied||0));
-        if(cashPaid>0.001 || (b.paymentStatus==='received'&&(b.creditApplied||0)>0.001)){
-          hist.push({kind:'received',date:b.date,amount:cashPaid,billTotal:bFull,status:b.paymentStatus,creditUsed:b.creditApplied||0,billId:b._id});
+        // Direct cash payment row — ONLY for the portion paid by direct payment (not from general pool).
+        // cashPaid = total cash received for this bill minus credit applied minus general pool payments.
+        // Formula mirrors computeAnalyticsData: bPaid = (partialAmount or grandTotal) - creditApplied.
+        var totalPaid = b.paymentStatus==='received' ? bFull
+          : b.paymentStatus==='partial' ? (b.partialAmount||0) : 0;
+        var directCash = Math.max(0, totalPaid - (b.creditApplied||0) - generalOnBill);
+        if(directCash > 0.001){
+          hist.push({kind:'received',date:b.date,amount:directCash,billTotal:bFull,status:b.paymentStatus,creditUsed:b.creditApplied||0,billId:b._id});
         }
-        // Credit applied to this bill
+        // Credit applied to this bill (from credit pool)
         if((b.creditApplied||0)>0.001){
           hist.push({kind:'applied',date:b.date,amount:b.creditApplied,billId:b._id,billTotal:bFull});
         }
