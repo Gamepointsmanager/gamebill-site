@@ -1292,7 +1292,7 @@
         state.masterGames = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
       }));
       // Listen to bills (latest 100)
-      _unsubs.push(db.collection(bp+'/bills').orderBy('date','desc').limit(100).onSnapshot(snap => {
+      _unsubs.push(db.collection(bp+'/bills').onSnapshot(snap => {
         state.bills = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
         
         // Migrate old bills without reference numbers
@@ -3777,8 +3777,13 @@
                 }
               }
             }
-            // Save bill to Firestore — listener will update state.bills
+            // Save bill to Firestore and immediately add to state.bills so UI updates
+            // without waiting for the onSnapshot listener (which may be slow or miss past-dated bills)
             const _newBillRef = await db.collection(userPath()+'/bills').add(bill);
+            const _newBillWithId = Object.assign({ _id: _newBillRef.id }, bill);
+            state.bills = state.bills.filter(function(b){ return b._id !== _newBillRef.id; });
+            state.bills.push(_newBillWithId);
+            _gbCache.set('data', {mg:state.masterGames, bills:state.bills, companies:state.companies});
             // If credit was applied, reduce company creditBalance
             if(bill.creditApplied > 0){
               var prevCrBal = typeof c.creditBalance==='number' ? c.creditBalance : getCompanyCreditBalance(c);
