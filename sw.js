@@ -1,12 +1,14 @@
-const CACHE = 'gamebill-v2';
+const CACHE = 'sweepadmin-vs-v1';
 const BASE = './';
 
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll([
-      BASE,
-      BASE + 'index.html'
-    ])).catch(() => {})
+    caches.open(CACHE).then(cache => {
+      return cache.addAll([
+        BASE,
+        BASE + 'index.html'
+      ]);
+    })
   );
   self.skipWaiting();
 });
@@ -14,20 +16,38 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    ).then(() => clients.claim())
+      Promise.all(
+        keys.map(key => {
+          if (key !== CACHE) {
+            return caches.delete(key);
+          }
+        })
+      )
+    ).then(() => self.clients.claim())
   );
 });
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+
   e.respondWith(
-    fetch(e.request).then(r => {
-      if (r.ok) {
-        const c = r.clone();
-        caches.open(CACHE).then(cache => cache.put(e.request, c)).catch(() => {});
-      }
-      return r;
-    }).catch(() => caches.match(e.request))
+    fetch(e.request)
+      .then(res => {
+        // Cache successful responses
+        if (res && res.status === 200 && res.type === 'basic') {
+          const clone = res.clone();
+          caches.open(CACHE).then(cache => {
+            cache.put(e.request, clone);
+          });
+        }
+        return res;
+      })
+      .catch(() => {
+        // Try cache first
+        return caches.match(e.request).then(cached => {
+          // If not found, fallback to index.html (useful for SPAs / offline)
+          return cached || caches.match(BASE + 'index.html');
+        });
+      })
   );
 });
