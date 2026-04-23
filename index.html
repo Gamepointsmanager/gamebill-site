@@ -1721,7 +1721,7 @@
           return '<div class="bill-hist-wrap" data-date="'+toLocalDate(b.date).toISOString()+'" data-billid="'+b._id+'" data-search="'+searchData+'" data-ref="'+refNum.toLowerCase()+'">'
             +'<div class="bill-history-item" style="cursor:pointer;flex-wrap:wrap" onclick="this.nextElementSibling.classList.toggle(\'hidden\')">'
             +'<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--textSecondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+dateStr+(refNum?' · <span class="bh-ref-desktop" style="color:#a78bfa;font-family:monospace;font-size:10px">'+esc(refNum)+'</span>':'')+'</div>'
-            +'<div style="font-size:10px;color:var(--textMuted)">'+(b.items||[]).length+' items'+(state.empRole!=='employee'?' · <span style="color:'+(totalPL>=0?'#34d399':'var(--red)')+'">P/L $'+totalPL.toFixed(2)+'</span>':'')+'</div></div>'
+            +'<div style="font-size:10px;color:var(--textMuted)">'+(b.items||[]).length+' items'+((state.empRole!=='employee'||getEmpPerm('viewProfitLoss'))?' · <span style="color:'+(totalPL>=0?'#34d399':'var(--red)')+'">P/L $'+totalPL.toFixed(2)+'</span>':'')+'</div></div>'
             +'<div style="text-align:right;flex-shrink:0"><div style="font-weight:700;color:#34d399;font-family:Orbitron,monospace;font-size:12px">$'+((b.totalDollars||0)+(b.extraFeeAmount||0)).toFixed(2)+'</div>'
             +'<div style="font-size:10px;color:#22d3ee">'+(b.totalPoints||0).toFixed(0)+' pts</div></div>'
             +'<div class="bh-actions" style="display:flex;align-items:center;gap:4px;flex-shrink:0">'
@@ -1734,7 +1734,7 @@
             +'<button class="btn btn-ghost btn-sm bill-hist-menu" data-billid="'+b._id+'" style="color:#a78bfa;padding:2px 5px" onclick="event.stopPropagation()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>'
             +'</div></div>'
             +'<div class="hidden" style="padding:8px 12px;background:rgba(10,8,20,0.5);border-bottom:1px solid rgba(60,50,100,0.3);font-size:12px">'
-            +plItems.map(function(i){return '<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(60,50,100,0.15)"><span style="color:var(--textSecondary)">'+(i.gameName||'-')+'</span><span style="color:var(--textMuted)">'+(i.username||'-')+'</span><span style="color:#22d3ee">'+(i.points||0)+' pts</span><span style="color:#34d399">$'+(i.dollars||0).toFixed(2)+'</span>'+(state.empRole!=='employee'?'<span style="color:'+(i.pl>=0?'#34d399':'var(--red)')+'">P/L $'+i.pl.toFixed(2)+'</span>':'')+'</div>'}).join('')
+            +plItems.map(function(i){return '<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(60,50,100,0.15)"><span style="color:var(--textSecondary)">'+(i.gameName||'-')+'</span><span style="color:var(--textMuted)">'+(i.username||'-')+'</span><span style="color:#22d3ee">'+(i.points||0)+' pts</span><span style="color:#34d399">$'+(i.dollars||0).toFixed(2)+'</span>'+((state.empRole!=='employee'||getEmpPerm('viewProfitLoss'))?'<span style="color:'+(i.pl>=0?'#34d399':'var(--red)')+'">P/L $'+i.pl.toFixed(2)+'</span>':'')+'</div>'}).join('')
             +(b.extraFeeAmount>0?'<div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid rgba(245,158,11,0.2);color:#fbbf24;font-weight:600"><span>Extra Fee ('+(b.extraFeePercent||0)+'%)</span><span>$'+(b.extraFeeAmount).toFixed(2)+'</span></div>':'')
             +(b.creditApplied>0?'<div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid rgba(16,185,129,0.2);color:#34d399;font-weight:600"><span>Credit Applied</span><span>-$'+(b.creditApplied).toFixed(2)+'</span></div>':'')
             +'<div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid rgba(120,100,200,0.2);font-weight:700;font-size:13px"><span style="color:var(--textSecondary)">Final Amount</span><span style="color:#34d399">$'+((b.totalDollars||0)+(b.extraFeeAmount||0)-(b.creditApplied||0)).toFixed(2)+'</span></div>'
@@ -2463,13 +2463,13 @@
 
       show('menuDeleteAll',       !isEmpAcc);
       show('menuClearBillRange',  !isEmpAcc);
-      show('panelQuickSummary',   !isEmpAcc);
-      show('panelQuickSummaryDiv',!isEmpAcc);
-      show('settingsPLWrap',      !isEmpAcc);
+      show('panelQuickSummary',   !isEmpAcc || getEmpPerm('quickSummary'));
+      show('panelQuickSummaryDiv',!isEmpAcc || getEmpPerm('quickSummary'));
+      show('settingsPLWrap',      !isEmpAcc || getEmpPerm('viewProfitLoss'));
       show('menuExport',          !isEmpAcc);
       show('menuImport',          !isEmpAcc);
-      show('menuGlobalAnalytics', !isEmpAcc);
-      show('menuGenReport',       !isEmpAcc);
+      show('menuGlobalAnalytics', !isEmpAcc || getEmpPerm('globalAnalytics'));
+      show('menuGenReport',       !isEmpAcc || getEmpPerm('generateReport'));
       show('panelSubCard',        !isEmpAcc);
       show('menuShiftSection',     isEmpAcc);
       // Hide username row for cashier accounts (it doesn't work for employees)
@@ -3203,11 +3203,12 @@
       const list = $('#mgList');
       if (!list) return;
       const filtered = state.masterGames.filter(g => g.name.toLowerCase().includes(search));
+      const showCostRate = state.empRole !== 'employee' || getEmpPerm('viewCostRate');
       list.innerHTML = filtered.map(g => `
         <div class="mg-row" style="display:flex;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border);gap:8px;cursor:pointer;transition:background 0.15s" data-id="${g._id}" onmouseenter="this.style.background='var(--bgHover)'" onmouseleave="this.style.background='transparent'">
           <span style="font-size:16px">🎮</span>
           <span style="flex:1;font-weight:600;font-size:14px">${esc(g.name)}</span>
-          <span class="badge badge-orange" style="margin-right:4px">${g.costRate||0}%</span>
+          ${showCostRate ? `<span class="badge badge-orange" style="margin-right:4px">${g.costRate||0}%</span>` : ''}
           <span class="badge ${(g.remainingPoints||0) > 0 ? 'badge-cyan' : 'badge-red'}">${(g.remainingPoints||0).toLocaleString()} pts</span>
           <span style="color:var(--textMuted);font-size:12px">▸</span>
         </div>
@@ -3252,6 +3253,7 @@
     function showMasterGameDetail(g) {
       $('#mgDetailOverlay')?.remove();
       const isEmp = state.empRole === 'employee';
+      const canSeeCostRate = !isEmp || getEmpPerm('viewCostRate');
       const lockIcon = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;flex-shrink:0"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
       const overlay = document.createElement('div');
       overlay.className = 'modal-overlay';
@@ -3270,11 +3272,12 @@
           <span class="label">Remaining Points</span>
           <input class="input" type="number" id="mgDetailPts" value="${g.remainingPoints||0}" />
         </div>
+        ${canSeeCostRate ? `
         <div style="margin-bottom:16px">
           <span class="label" style="display:flex;align-items:center">${isEmp ? lockIcon : ''}Cost Rate (%)</span>
           <input class="input" type="number" id="mgDetailCostRate" value="${g.costRate||0}" ${isEmp ? 'readonly style="opacity:0.45;cursor:not-allowed;background:var(--bgInput)"' : ''} />
           ${isEmp ? '<div style="font-size:10px;color:#fbbf24;margin-top:3px;display:flex;align-items:center;gap:4px">' + lockIcon + 'Only manager can edit rate</div>' : ''}
-        </div>
+        </div>` : ''}
         <div style="display:flex;gap:8px">
           <button class="btn btn-green" id="mgDetailSave" style="flex:1">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg>
@@ -3676,7 +3679,7 @@
               <div class="bill-history-item" style="cursor:pointer;flex-wrap:wrap" onclick="this.nextElementSibling.classList.toggle('hidden')">
                 <div style="flex:1;min-width:0">
                   <div style="font-size:11px;color:var(--textSecondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(function(){var dd=toLocalDate(b.date);return dd.toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'2-digit'})+' '+dd.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:true})})()}${b.referenceNumber?` · <span class="bh-ref-desktop" style="color:#a78bfa;font-family:monospace;font-size:10px">${esc(b.referenceNumber)}</span>`:''}</div>
-                  <div style="font-size:10px;color:var(--textMuted)">${(b.items||[]).length} items${state.empRole !== 'employee' ? ' · <span style="color:'+`${totalPL>=0?'#34d399':'var(--red)'}`+'">P/L $'+totalPL.toFixed(2)+'</span>' : ''}</div>
+                  <div style="font-size:10px;color:var(--textMuted)">${(b.items||[]).length} items${(state.empRole !== 'employee' || getEmpPerm('viewProfitLoss')) ? ' · <span style="color:'+`${totalPL>=0?'#34d399':'var(--red)'}`+'">P/L $'+totalPL.toFixed(2)+'</span>' : ''}</div>
                 </div>
                 <div style="text-align:right;flex-shrink:0">
                   <div style="font-weight:700;color:#34d399;font-family:'Orbitron',monospace;font-size:12px">$${((b.totalDollars||0)+(b.extraFeeAmount||0)).toFixed(2)}</div>
@@ -3698,10 +3701,10 @@
                   <span style="color:var(--textMuted)">${i.username||'-'}</span>
                   <span style="color:#22d3ee">${(i.points||0)} pts</span>
                   <span style="color:#34d399">$${(i.dollars||0).toFixed(2)}</span>
-                  ${state.empRole !== 'employee' ? '<span style="color:'+( i.pl>=0?'#34d399':'var(--red)')+'\">'+'P/L $'+i.pl.toFixed(2)+'</span>' : ''}
+                  ${(state.empRole !== 'employee' || getEmpPerm('viewProfitLoss')) ? '<span style="color:'+( i.pl>=0?'#34d399':'var(--red)')+'\">'+'P/L $'+i.pl.toFixed(2)+'</span>' : ''}
                 </div>`).join('')}
                 ${b.extraFeeAmount > 0 ? '<div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid rgba(245,158,11,0.2);color:#fbbf24;font-weight:600"><span>Extra Fee ('+b.extraFeePercent+'%)</span><span>$'+(b.extraFeeAmount).toFixed(2)+'</span></div>' : ''}
-                ${(state.empRole !== 'employee' && b.extraFeeProfit) ? '<div style="display:flex;justify-content:space-between;padding:2px 0;font-size:11px;color:var(--textMuted)"><span>Fee Profit</span><span style="color:#34d399">$'+(b.extraFeeProfit).toFixed(2)+'</span></div>' : ''}
+                ${((state.empRole !== 'employee' || getEmpPerm('viewProfitLoss')) && b.extraFeeProfit) ? '<div style="display:flex;justify-content:space-between;padding:2px 0;font-size:11px;color:var(--textMuted)"><span>Fee Profit</span><span style="color:#34d399">$'+(b.extraFeeProfit).toFixed(2)+'</span></div>' : ''}
                 ${b.creditApplied > 0 ? '<div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid rgba(16,185,129,0.2);color:#34d399;font-weight:600"><span>Credit Applied</span><span>-$'+(b.creditApplied).toFixed(2)+'</span></div>' : ''}
                 <div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid rgba(120,100,200,0.2);font-weight:700;font-size:13px"><span style="color:var(--textSecondary)">Final Amount</span><span style="color:#34d399">$${((b.totalDollars||0)+(b.extraFeeAmount||0)-(b.creditApplied||0)).toFixed(2)}</span></div>
               </div>
@@ -7948,6 +7951,25 @@
     state.empEmployeeDoc = null;   // cashier doc data (if user is cashier)
     state.empView        = 'dashboard'; // 'dashboard' | 'employees' | 'salary'
 
+    // ── Permission helpers ──────────────────────────────────────────
+    // All permission keys (must match what's saved in Firestore employee doc)
+    const EMP_PERMS = {
+      globalAnalytics: 'globalAnalytics',
+      generateReport:  'generateReport',
+      viewProfitLoss:  'viewProfitLoss',
+      quickSummary:    'quickSummary',
+      viewCostRate:    'viewCostRate',
+    };
+
+    // Returns true if current employee has the given permission enabled
+    function getEmpPerm(key) {
+      if (state.empRole !== 'employee') return true; // owner always has all
+      const doc = state.empEmployeeDoc;
+      if (!doc) return false;
+      const perms = doc.permissions || {};
+      return perms[key] === true;
+    }
+
     let _shiftTimerInterval = null;
 
     // --- Firestore path helpers ---
@@ -9013,6 +9035,155 @@
       }
     }
 
+    // ============================================================
+    // EMPLOYEE PERMISSIONS MODAL
+    // ============================================================
+    async function showPermissionsModal(emp) {
+      if (!emp) return;
+      document.getElementById('empPermModal')?.remove();
+
+      const perms = emp.permissions || {};
+
+      const permDefs = [
+        {
+          key: 'globalAnalytics',
+          label: 'Global Analytics',
+          icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 118 2.83"/><path d="M22 12A10 10 0 0012 2v10z"/></svg>',
+          desc: 'View global analytics overview, charts and all-company revenue insights.',
+          related: 'Also enables the Analytics button in the hamburger menu.'
+        },
+        {
+          key: 'generateReport',
+          label: 'Generate Report',
+          icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
+          desc: 'Export transaction, P/L, game-wise, and total reports as CSV files.',
+          related: 'Enabling this may also reveal P/L data inside the report.'
+        },
+        {
+          key: 'viewProfitLoss',
+          label: 'View Profit / Loss',
+          icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22,7 13.5,15.5 8.5,10.5 2,17"/><polyline points="16,7 22,7 22,13"/></svg>',
+          desc: 'Show P/L values in bill history rows, company analytics, and summary cards.',
+          related: 'Interconnected: P/L data may also appear in Quick Summary if both are on.'
+        },
+        {
+          key: 'quickSummary',
+          label: 'Quick Summary',
+          icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>',
+          desc: 'Show the Revenue & Profit/Loss summary card in the hamburger menu.',
+          related: 'Interconnected: if View P/L is off, the P/L figure inside will be hidden.'
+        },
+        {
+          key: 'viewCostRate',
+          label: 'View Cost Rate',
+          icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+          desc: 'Show the cost rate (%) badge on games in the Master Game List.',
+          related: 'Without this, the employee sees point balances only — no cost rate info.'
+        },
+      ];
+
+      const toggleHTML = permDefs.map(p => {
+        const isOn = perms[p.key] === true;
+        return `
+          <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-radius:12px;background:rgba(18,14,38,0.7);border:1px solid ${isOn?'rgba(124,58,237,0.3)':'rgba(60,50,100,0.25)'};margin-bottom:8px;transition:border-color 0.2s">
+            <div style="flex-shrink:0;margin-top:2px">${p.icon}</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;font-weight:700;color:var(--textPrimary);margin-bottom:2px">${p.label}</div>
+              <div style="font-size:11px;color:var(--textMuted);line-height:1.4;margin-bottom:3px">${p.desc}</div>
+              <div style="font-size:10px;color:rgba(167,139,250,0.7);font-style:italic">${p.related}</div>
+            </div>
+            <label style="position:relative;display:inline-block;width:42px;height:24px;flex-shrink:0;cursor:pointer;margin-top:2px">
+              <input type="checkbox" class="perm-toggle" data-key="${p.key}" style="opacity:0;width:0;height:0" ${isOn?'checked':''}>
+              <span class="perm-track" style="position:absolute;cursor:pointer;inset:0;background:${isOn?'var(--purple)':'rgba(80,70,120,0.4)'};border-radius:12px;transition:0.2s"></span>
+              <span class="perm-thumb" style="position:absolute;height:18px;width:18px;left:${isOn?'21px':'3px'};bottom:3px;background:#fff;border-radius:50%;transition:0.2s;pointer-events:none"></span>
+            </label>
+          </div>`;
+      }).join('');
+
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay';
+      modal.id = 'empPermModal';
+      modal.innerHTML = `
+        <div class="modal fade-in" style="max-width:460px">
+          <div class="modal-header">
+            <div>
+              <h3 class="modal-title">PERMISSIONS</h3>
+              <div style="font-size:11px;color:var(--textMuted);margin-top:2px">${esc(emp.name||'Cashier')}</div>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="closePermModal"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+          </div>
+
+          <div style="padding:10px 12px;border-radius:10px;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.18);margin-bottom:14px">
+            <div style="display:flex;align-items:flex-start;gap:8px">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" style="flex-shrink:0;margin-top:1px"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              <p style="font-size:11px;color:#fbbf24;line-height:1.5;margin:0">Some permissions are interconnected — enabling one may reveal data from another feature. All permissions are <strong>off by default</strong> and apply only to this cashier individually.</p>
+            </div>
+          </div>
+
+          <div id="permToggleList">
+            ${toggleHTML}
+          </div>
+
+          <div style="display:flex;gap:8px;margin-top:14px">
+            <button class="btn btn-purple btn-full" id="savePermBtn" style="justify-content:center;font-weight:700">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg>
+              Save Permissions
+            </button>
+            <button class="btn btn-ghost" id="cancelPermBtn" style="flex-shrink:0">Cancel</button>
+          </div>
+          <div id="permSaveStatus" style="font-size:11px;text-align:center;color:var(--textMuted);min-height:16px;margin-top:6px"></div>
+        </div>`;
+      document.body.appendChild(modal);
+
+      modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+      document.getElementById('closePermModal').onclick = () => modal.remove();
+      document.getElementById('cancelPermBtn').onclick = () => modal.remove();
+
+      // Wire up toggle visual updates
+      modal.querySelectorAll('.perm-toggle').forEach(cb => {
+        cb.onchange = () => {
+          const track = cb.nextElementSibling;
+          const thumb = track.nextElementSibling;
+          track.style.background = cb.checked ? 'var(--purple)' : 'rgba(80,70,120,0.4)';
+          thumb.style.left = cb.checked ? '21px' : '3px';
+          // Update card border color
+          const card = cb.closest('[style*="border"]');
+          if (card) card.style.borderColor = cb.checked ? 'rgba(124,58,237,0.3)' : 'rgba(60,50,100,0.25)';
+        };
+      });
+
+      document.getElementById('savePermBtn').onclick = async () => {
+        const btn = document.getElementById('savePermBtn');
+        const statusEl = document.getElementById('permSaveStatus');
+        btn.disabled = true; btn.innerHTML = 'Saving…';
+        try {
+          const newPerms = {};
+          modal.querySelectorAll('.perm-toggle').forEach(cb => {
+            newPerms[cb.dataset.key] = cb.checked;
+          });
+          await trackedWrite(() =>
+            db.doc(empPath() + '/' + emp._id).update({ permissions: newPerms })
+          );
+          // Update local cache
+          emp.permissions = newPerms;
+          // If this employee is the currently logged-in cashier, update live state too
+          if (state.empEmployeeDoc && state.empEmployeeDoc._id === emp._id) {
+            state.empEmployeeDoc.permissions = newPerms;
+          }
+          statusEl.style.color = '#34d399';
+          statusEl.textContent = '✓ Permissions saved';
+          btn.disabled = false;
+          btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg> Save Permissions';
+          setTimeout(() => { statusEl.textContent = ''; }, 3000);
+        } catch(e) {
+          btn.disabled = false;
+          btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg> Save Permissions';
+          statusEl.style.color = '#f87171';
+          statusEl.textContent = '✗ Save failed: ' + e.message;
+        }
+      };
+    }
+
     async function refreshEmployeeList() {
       const wrap = document.getElementById('empListWrap');
       if (!wrap) return;
@@ -9063,6 +9234,7 @@
               ${isActive ? `<div style="text-align:right"><div style="font-size:9px;color:#34d399;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:1px;font-weight:700">Live</div><div class="shift-timer" style="font-size:15px;line-height:1.1" id="ot_${emp._id}">${formatHHMM(activeDurMs)}</div></div>` : ''}
               ${isActive ? `<button class="btn btn-sm emp-shiftout-btn" data-empid="${emp._id}" data-shiftid="${myShift._id}" data-startts="${myShift.startTime?.toDate ? myShift.startTime.toDate().getTime() : Date.now()}" style="font-size:11px;padding:6px 10px;gap:4px;flex-shrink:0;background:rgba(239,68,68,0.18);border:1px solid rgba(239,68,68,0.4);border-radius:8px;color:#f87171;font-weight:700"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg> Out</button>` : ''}
               <button class="btn btn-ghost btn-sm emp-edit-btn" data-empid="${emp._id}" style="font-size:12px;padding:6px 14px;gap:4px;flex-shrink:0;background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.3);border-radius:8px;color:#a78bfa;font-weight:700">${editSvg} Edit</button>
+              <button class="btn btn-ghost btn-sm emp-perm-btn" data-empid="${emp._id}" title="Manage Permissions" style="font-size:12px;padding:6px 10px;gap:4px;flex-shrink:0;background:rgba(6,182,212,0.12);border:1px solid rgba(6,182,212,0.3);border-radius:8px;color:#22d3ee;font-weight:700"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></button>
             </div>
           </div>
         </div>`;
@@ -9084,7 +9256,7 @@
       // Card click → detail modal
       wrap.querySelectorAll('.emp-card').forEach(card => {
         card.onclick = (e) => {
-          if (e.target.closest('.emp-edit-btn') || e.target.closest('.emp-fix-link-btn') || e.target.closest('.emp-shiftout-btn')) return;
+          if (e.target.closest('.emp-edit-btn') || e.target.closest('.emp-fix-link-btn') || e.target.closest('.emp-shiftout-btn') || e.target.closest('.emp-perm-btn')) return;
           showEmployeeDetailModal(card.dataset.empid, employees);
         };
       });
@@ -9108,6 +9280,12 @@
         btn.onclick = (e) => {
           e.stopPropagation();
           showAddEmployeeModal(employees.find(e2 => e2._id === btn.dataset.empid));
+        };
+      });
+      wrap.querySelectorAll('.emp-perm-btn').forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          showPermissionsModal(employees.find(e2 => e2._id === btn.dataset.empid));
         };
       });
       wrap.querySelectorAll('.emp-fix-link-btn').forEach(btn => {
