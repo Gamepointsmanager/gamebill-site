@@ -10175,25 +10175,14 @@
       filteredBills.forEach(function(bill) {
         var bD   = bill.totalDollars || 0;
         var bFull= bD + (bill.extraFeeAmount || 0);
-        var bCr  = bill.creditApplied || 0;
-        // Cash received on this bill (same formula as computeAnalyticsData)
-        var bPaid = bill.paymentStatus === 'received'
-          ? Math.max(0, bFull - bCr)
-          : (bill.paymentStatus === 'partial' ? Math.max(0, (bill.partialAmount || 0) - bCr) : 0);
-        // Extra payments: count isCredit:true (overpayment → credit) and isGeneral on holder bills
-        var exReal = 0;
-        var _isHolder = (bill.totalDollars || 0) === 0 && ((bill.totalPoints || 0) === 0);
-        (bill.extraPayments || []).forEach(function(ep) {
-          if (ep.isCredit)                        { exReal += (ep.amount || 0); }
-          else if (ep.isGeneral && _isHolder)     { exReal += (ep.amount || 0); }
-        });
-        var thisRec = bPaid + exReal;
-        inflow += thisRec;
 
-        // Point redemption cost (outflow): negative-point items
+        // ── INFLOW: final bill amount (totalDollars + extraFeeAmount) per company ──
+        inflow += bFull;
+
+        // ── OUTFLOW: cost basis calculated from bill items (costRate * points) ──
         (bill.items || []).forEach(function(it) {
           var pts = it.points || 0;
-          if (pts < 0) {
+          if (pts !== 0) {
             var absPts = Math.abs(pts);
             var cR = (it.costRate != null ? it.costRate : null);
             if (cR === null) cR = getCostRate(it.gameName);
@@ -10201,15 +10190,15 @@
           }
         });
 
-        // Payment-method breakdown: look up the cfTransaction matching this bill's referenceNumber
-        if (thisRec > 0) {
+        // Payment-method breakdown: attribute inflow to payment method per bill
+        if (bFull > 0) {
           var refId = bill.referenceNumber || bill._id;
           var tx = cfTransactions.find(function(t) { return t.billId === refId; });
           var pmId = (tx && tx.paymentMethodId) || bill.paymentMethodId || '';
           if (pmId && byMethod[pmId]) {
-            byMethod[pmId].total  += thisRec;
+            byMethod[pmId].total  += bFull;
             byMethod[pmId].txs.push({
-              date: bill.date, amount: thisRec,
+              date: bill.date, amount: bFull,
               note: refId, companyName: (state.companies && state.companies[bill.companyId] && state.companies[bill.companyId].name) || bill.companyName || '',
               paymentMethodId: pmId
             });
@@ -10234,31 +10223,20 @@
       }
 
       // ── TOTALS ──
-      // Outflow = point redemption cost + manual op expenses + cashier salaries
+      // Outflow = cost basis from bill items + manual op expenses + cashier salaries
       var totalOpEx    = opExpTotal + salaryTotal;
       var totalOutflow = redemptionCost + totalOpEx;
-      var netProfit    = inflow - totalOutflow;
+      var grossProfit  = inflow - totalOutflow;
 
       // filteredTxs: for the tracking tab transaction list, build a unified list from filteredBills
       // so the list shows real data even before cfTransactions are fully synced
       var filteredTxs = filteredBills
-        .filter(function(b) { return (b.paymentStatus === 'received' || b.paymentStatus === 'partial'); })
         .map(function(b) {
           var refId = bill_refId(b);
           var tx = cfTransactions.find(function(t) { return t.billId === refId; });
           var pmId = (tx && tx.paymentMethodId) || b.paymentMethodId || '';
           var bFull2 = (b.totalDollars || 0) + (b.extraFeeAmount || 0);
-          var bCr2 = b.creditApplied || 0;
-          var bPaid2 = b.paymentStatus === 'received'
-            ? Math.max(0, bFull2 - bCr2)
-            : Math.max(0, (b.partialAmount || 0) - bCr2);
-          var exReal2 = 0;
-          var _isH2 = (b.totalDollars || 0) === 0 && ((b.totalPoints || 0) === 0);
-          (b.extraPayments || []).forEach(function(ep) {
-            if (ep.isCredit) exReal2 += (ep.amount || 0);
-            else if (ep.isGeneral && _isH2) exReal2 += (ep.amount || 0);
-          });
-          var amt = bPaid2 + exReal2;
+          var amt = bFull2;
           if (amt <= 0) return null;
           return {
             id: b._id, type: 'income', category: 'bill',
@@ -10274,7 +10252,7 @@
         .filter(Boolean)
         .sort(function(a, b) { return billToDate(b.date) - billToDate(a.date); });
 
-      return { inflow, redemptionCost, opExpTotal, totalOpEx, totalOutflow, netProfit,
+      return { inflow, redemptionCost, opExpTotal, totalOpEx, totalOutflow, grossProfit,
                salaryTotal, salaryEmployees, byMethod,
                filteredTxs: filteredTxs, opFiltered,
                salaryLoaded: !!_cfSalaryCache };
@@ -10299,8 +10277,8 @@
     }
 
     // ── Compute monthly dividend with paid status ──
-    function cfComputeDividends(netProfit) {
-      var pool = Math.max(0, netProfit);
+    function cfComputeDividends(grossProfit) {
+      var pool = Math.max(0, grossProfit);
       // Current month period key e.g. "2026-04"
       var now = new Date();
       var currentPeriod = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
@@ -10361,12 +10339,12 @@
             // Patch summary cards that show salary-affected numbers
             var salEl = document.getElementById('cfSalaryTotal');
             var opExEl= document.getElementById('cfTotalOpEx');
-            var netEl = document.getElementById('cfNetProfit');
+            var gpEl  = document.getElementById('cfGrossProfit');
             var outEl = document.getElementById('cfTotalOutflow');
             if (salEl) salEl.textContent = '$' + s.salaryTotal.toFixed(2);
             if (opExEl) opExEl.textContent = '$' + s.totalOpEx.toFixed(2);
             if (outEl) { outEl.textContent = '$' + s.totalOutflow.toFixed(2); }
-            if (netEl) { netEl.textContent = (s.netProfit>=0?'+':'')+' $'+s.netProfit.toFixed(2); netEl.style.color = s.netProfit>=0?'#34d399':'#f87171'; }
+            if (gpEl) { gpEl.textContent = (s.grossProfit>=0?'+':'')+' $'+s.grossProfit.toFixed(2); gpEl.style.color = s.grossProfit>=0?'#34d399':'#f87171'; }
             // For full re-render of expenses tab which shows salary detail
             var expSalaryWrap = document.getElementById('cfSalaryBreakdown');
             if (expSalaryWrap) expSalaryWrap.innerHTML = renderCFSalaryRows(s);
@@ -10379,7 +10357,7 @@
       else if (tab === 'tracking') content = renderCFTracking(summary, fromDate, toDate, fromDateD, toDateD);
       else if (tab === 'methods') content = renderCFMethods();
       else if (tab === 'expenses') content = renderCFExpenses(summary);
-      else if (tab === 'shareholders') content = renderCFShareholders(summary.netProfit);
+      else if (tab === 'shareholders') content = renderCFShareholders(summary.grossProfit);
 
       return `<div class="page fade-in">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
@@ -10398,7 +10376,7 @@
     }
 
     function renderCFOverview(summary, fromDate, toDate, fromDateD, toDateD) {
-      var divs = cfComputeDividends(summary.netProfit);
+      var divs = cfComputeDividends(summary.grossProfit);
       var totalShareholder = divs.reduce((s,d) => s + d.percentage, 0);
       return `
         <div style="display:flex;gap:6px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap">
@@ -10415,10 +10393,10 @@
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
           ${[
-            {label:'CASH INFLOW',  val:'$'+summary.inflow.toFixed(2),  sub:'All received payments',         color:'#34d399', bg:'rgba(16,185,129,0.08)', bc:'rgba(16,185,129,0.2)',  svgPath:'<polyline points="23,6 13.5,15.5 8.5,10.5 1,18"/><polyline points="17,6 23,6 23,12"/>', id:'cfInflowVal'},
+            {label:'CASH INFLOW',  val:'$'+summary.inflow.toFixed(2),  sub:'Total final bill amounts',         color:'#34d399', bg:'rgba(16,185,129,0.08)', bc:'rgba(16,185,129,0.2)',  svgPath:'<polyline points="23,6 13.5,15.5 8.5,10.5 1,18"/><polyline points="17,6 23,6 23,12"/>', id:'cfInflowVal'},
             {label:'CASH OUTFLOW', val:'$'+summary.totalOutflow.toFixed(2), sub:'Cost: $'+summary.redemptionCost.toFixed(2)+' · OpEx: $'+summary.totalOpEx.toFixed(2), color:'#f87171', bg:'rgba(239,68,68,0.08)', bc:'rgba(239,68,68,0.2)', svgPath:'<polyline points="23,18 13.5,8.5 8.5,13.5 1,6"/><polyline points="17,18 23,18 23,12"/>', id:'cfTotalOutflow'},
             {label:'OP. EXPENSES', val:'$'+summary.totalOpEx.toFixed(2),   sub:'Manual + Salaries',              color:'#fbbf24', bg:'rgba(245,158,11,0.08)', bc:'rgba(245,158,11,0.2)',  svgPath:'<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>', id:'cfTotalOpEx'},
-            {label:'NET PROFIT',   val:(summary.netProfit>=0?'+':'')+' $'+summary.netProfit.toFixed(2), sub:'Inflow − Outflow',   color:summary.netProfit>=0?'#34d399':'#f87171', bg:summary.netProfit>=0?'rgba(16,185,129,0.08)':'rgba(239,68,68,0.08)', bc:summary.netProfit>=0?'rgba(16,185,129,0.2)':'rgba(239,68,68,0.2)', svgPath:'<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>', id:'cfNetProfit'},
+            {label:'GROSS PROFIT', val:(summary.grossProfit>=0?'+':'')+' $'+summary.grossProfit.toFixed(2), sub:'Inflow − Outflow',   color:summary.grossProfit>=0?'#34d399':'#f87171', bg:summary.grossProfit>=0?'rgba(16,185,129,0.08)':'rgba(239,68,68,0.08)', bc:summary.grossProfit>=0?'rgba(16,185,129,0.2)':'rgba(239,68,68,0.2)', svgPath:'<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>', id:'cfGrossProfit'},
           ].map(c=>`<div style="padding:14px;border-radius:12px;background:${c.bg};border:1px solid ${c.bc}">
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="${c.color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${c.svgPath}</svg>
@@ -10438,8 +10416,8 @@
             </div>
           </div>
           <div style="font-size:11px;color:var(--textMuted);margin-bottom:4px">
-            Dividend pool: <span style="color:#34d399;font-family:'Orbitron',monospace;font-size:11px;font-weight:700">$${Math.max(0, summary.netProfit).toFixed(2)}</span>
-            <span style="color:var(--textMuted)"> net profit</span>
+            Dividend pool: <span style="color:#34d399;font-family:'Orbitron',monospace;font-size:11px;font-weight:700">$${Math.max(0, summary.grossProfit).toFixed(2)}</span>
+            <span style="color:var(--textMuted)"> gross profit</span>
           </div>
           <div style="height:1px;background:rgba(52,211,153,0.15);margin-bottom:10px"></div>
           ${divs.map(d=>`<div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid rgba(120,100,200,0.1)">
@@ -10659,8 +10637,8 @@
         </div>`;
     }
 
-    function renderCFShareholders(netProfit) {
-      var divs = cfComputeDividends(netProfit);
+    function renderCFShareholders(grossProfit) {
+      var divs = cfComputeDividends(grossProfit);
       var totalPct = cfShareholders.reduce((s, h) => s + (h.percentage || 0), 0);
       var now = new Date();
       var currentPeriod = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
@@ -10713,7 +10691,7 @@
           </div>
           <div style="margin-top:10px;padding:10px 14px;border-radius:10px;background:rgba(124,58,237,0.06);border:1px solid rgba(124,58,237,0.2);display:flex;justify-content:space-between;align-items:center">
             <span style="font-family:'Orbitron',monospace;font-size:11px;color:#c084fc;font-weight:700">TOTAL POOL</span>
-            <span style="font-family:'Orbitron',monospace;font-size:15px;font-weight:800;color:${netProfit>=0?'#34d399':'#f87171'}">$${Math.max(0,netProfit).toFixed(2)}</span>
+            <span style="font-family:'Orbitron',monospace;font-size:15px;font-weight:800;color:${grossProfit>=0?'#34d399':'#f87171'}">$${Math.max(0,grossProfit).toFixed(2)}</span>
           </div>
         </div>`; 
     }
