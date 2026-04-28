@@ -3255,7 +3255,7 @@
             ${isManager && g.assignedUsername ? `<div style="font-size:10px;color:var(--textMuted);margin-top:1px">${esc(g.assignedUsername)} · ${esc(g.assignedLevel||'')}</div>` : ''}
           </div>
           ${showCostRate ? `<span class="badge badge-orange" style="margin-right:2px">${g.costRate||0}%</span>` : ''}
-          ${(g.orderedPoints||0) > 0 ? `<span class="badge badge-yellow" title="Ordered/Pending">${(g.orderedPoints||0).toLocaleString()} ord</span>` : ''}
+          ${(g.orderedPoints||0) > 0 ? `<span class="badge badge-yellow" title="Ordered Points">${(g.orderedPoints||0).toLocaleString()} ord pts</span>` : ''}
           <span class="badge ${(g.remainingPoints||0) > 0 ? 'badge-cyan' : 'badge-red'}">${(g.remainingPoints||0).toLocaleString()} pts</span>
           <span style="color:var(--textMuted);font-size:12px">▸</span>
         </div>
@@ -3300,7 +3300,7 @@
     // ============================================================
     // HIERARCHY LEVELS FOR MASTER GAME INVENTORY
     // ============================================================
-    const MG_HIERARCHY_LEVELS = ['Supermaster', 'Master', 'Agent', 'Distributor', 'Subdistributor', 'Store'];
+    const MG_HIERARCHY_LEVELS = ['Agent', 'Supermaster', 'Master', 'Distributor', 'Subdistributor', 'Store'];
 
     function showMasterGameDetail(g) {
       $('#mgDetailOverlay')?.remove();
@@ -3328,7 +3328,7 @@
             <input class="input" type="number" id="mgDetailPts" value="${g.remainingPoints||0}" />
           </div>
           ${(g.orderedPoints||0) > 0 ? `<div style="margin-bottom:16px;padding:10px 12px;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);border-radius:8px;display:flex;align-items:center;justify-content:space-between">
-            <span style="font-size:11px;color:#fbbf24;font-weight:600">Ordered (Pending)</span>
+            <span style="font-size:11px;color:#fbbf24;font-weight:600">Ordered Points</span>
             <span class="badge badge-yellow">${(g.orderedPoints||0).toLocaleString()} pts</span>
           </div>` : ''}
           ${canSeeCostRate ? `
@@ -3366,10 +3366,12 @@
       const orderHistory   = g.orderHistory   || [];
       const billingHistory = g.billingHistory || [];
 
-      const lvlOptions = MG_HIERARCHY_LEVELS.map(l =>
-        `<option value="${l}" ${(g.assignedLevel||'') === l ? 'selected' : ''}>${l}</option>`).join('');
-      const highLvlOptions = MG_HIERARCHY_LEVELS.map(l =>
-        `<option value="${l}" ${(g.highestLevel||'') === l ? 'selected' : ''}>${l}</option>`).join('');
+      // Build searchable dropdown items for hierarchy level pickers
+      function mgLvlItems(selected) {
+        return ['', ...MG_HIERARCHY_LEVELS].map(l =>
+          `<div class="dropdown-item mg-lvl-option" data-value="${l}" style="${l===selected?'background:rgba(124,58,237,0.13);color:var(--purpleLight)':''}">${l||'<span style=\'color:var(--textMuted);font-style:italic\'>— None —</span>'}</div>`
+        ).join('');
+      }
 
       // Build history rows
       function fmtHistRows(arr, cols, emptyMsg) {
@@ -3422,7 +3424,7 @@
             <div style="font-size:10px;color:var(--textMuted)">pts</div>
           </div>
           <div style="background:var(--bgInput);border-radius:10px;padding:12px;text-align:center">
-            <div style="font-size:10px;color:var(--textMuted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px">Ordered (Pending)</div>
+            <div style="font-size:10px;color:var(--textMuted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px">Ordered Points</div>
             <div style="font-size:22px;font-weight:700;color:#fbbf24">${ordered.toLocaleString()}</div>
             <div style="font-size:10px;color:var(--textMuted)">pts</div>
           </div>
@@ -3430,7 +3432,7 @@
 
         <!-- TABS -->
         <div style="display:flex;gap:4px;margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:0">
-          ${['Config','Stock','Order','History'].map((t,i) =>
+          ${['Config','Stock','History'].map((t,i) =>
             `<button class="mg-inv-tab btn btn-ghost btn-sm" data-tab="${t}" style="border-radius:6px 6px 0 0;${i===0?'background:var(--bgInput);':''}">${t}</button>`
           ).join('')}
         </div>
@@ -3454,11 +3456,23 @@
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
             <div>
               <span class="label">Assigned Account Level</span>
-              <select class="input" id="mgDetailAssignedLevel"><option value="">— Select —</option>${lvlOptions}</select>
+              <div style="position:relative" id="mgAssignedLevelWrap">
+                <input class="input mg-lvl-search" id="mgDetailAssignedLevel" data-field="assignedLevel" placeholder="Search level..." value="${esc(g.assignedLevel||'')}" autocomplete="off" readonly style="cursor:pointer" />
+                <div class="mg-lvl-dropdown hidden" id="mgAssignedLevelDrop" style="position:absolute;top:calc(100% + 2px);left:0;right:0;background:rgba(16,13,30,0.97);border:1px solid var(--glassBorder);border-radius:10px;z-index:9999;max-height:200px;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,0.6)">
+                  <div class="dropdown-search"><input class="input" id="mgAssignedLevelSearch" placeholder="Search..." style="font-size:12px;padding:6px 10px" /></div>
+                  <div id="mgAssignedLevelList">${mgLvlItems(g.assignedLevel||'')}</div>
+                </div>
+              </div>
             </div>
             <div>
               <span class="label">Highest Level (This Game)</span>
-              <select class="input" id="mgDetailHighestLevel"><option value="">— Select —</option>${highLvlOptions}</select>
+              <div style="position:relative" id="mgHighestLevelWrap">
+                <input class="input mg-lvl-search" id="mgDetailHighestLevel" data-field="highestLevel" placeholder="Search level..." value="${esc(g.highestLevel||'')}" autocomplete="off" readonly style="cursor:pointer" />
+                <div class="mg-lvl-dropdown hidden" id="mgHighestLevelDrop" style="position:absolute;top:calc(100% + 2px);left:0;right:0;background:rgba(16,13,30,0.97);border:1px solid var(--glassBorder);border-radius:10px;z-index:9999;max-height:200px;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,0.6)">
+                  <div class="dropdown-search"><input class="input" id="mgHighestLevelSearch" placeholder="Search..." style="font-size:12px;padding:6px 10px" /></div>
+                  <div id="mgHighestLevelList">${mgLvlItems(g.highestLevel||'')}</div>
+                </div>
+              </div>
             </div>
           </div>
           <div style="display:flex;gap:8px">
@@ -3483,42 +3497,18 @@
             </div>
             <div>
               <span class="label">Action</span>
-              <select class="input" id="mgStockAction">
-                <option value="Add">Add Stock (+)</option>
-                <option value="Set">Set Total (replace)</option>
-                <option value="Deduct">Deduct (correction)</option>
-              </select>
+              <div style="position:relative" id="mgStockActionWrap">
+                <input class="input" id="mgStockAction" placeholder="Select action..." value="Add Stock (+)" autocomplete="off" readonly style="cursor:pointer" data-value="Add" />
+                <div class="mg-lvl-dropdown hidden" id="mgStockActionDrop" style="position:absolute;top:calc(100% + 2px);left:0;right:0;background:rgba(16,13,30,0.97);border:1px solid var(--glassBorder);border-radius:10px;z-index:9999;max-height:200px;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,0.6)">
+                  <div class="dropdown-item mg-stock-option" data-value="Add">Add Stock <span style="color:var(--textMuted);font-size:11px">(+)</span></div>
+                  <div class="dropdown-item mg-stock-option" data-value="Set">Set Total <span style="color:var(--textMuted);font-size:11px">(replace)</span></div>
+                  <div class="dropdown-item mg-stock-option" data-value="Deduct">Deduct <span style="color:var(--textMuted);font-size:11px">(correction)</span></div>
+                </div>
+              </div>
             </div>
           </div>
           <button class="btn btn-green" id="mgStockApply" style="width:100%">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Apply Stock Action
-          </button>
-        </div>
-
-        <!-- TAB: ORDER -->
-        <div id="mgTab-Order" style="display:none">
-          <div style="background:rgba(34,211,238,0.06);border:1px solid rgba(34,211,238,0.15);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:11px;color:#22d3ee">
-            Place an <b>Order</b> when sourcing points from a superior. This adds to Ordered (Pending) balance without touching Available.
-          </div>
-          <div style="margin-bottom:12px">
-            <span class="label">Order Amount</span>
-            <input class="input" type="number" id="mgOrderAmt" placeholder="0" />
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
-            <div>
-              <span class="label">Username</span>
-              <input class="input" id="mgOrderUsername" value="${esc(g.assignedUsername||'')}" placeholder="Superior username" />
-            </div>
-            <div>
-              <span class="label">Account Level</span>
-              <select class="input" id="mgOrderLevel">
-                <option value="">— Select —</option>
-                ${MG_HIERARCHY_LEVELS.map(l => `<option value="${l}" ${(g.assignedLevel||'')=== l?'selected':''}>${l}</option>`).join('')}
-              </select>
-            </div>
-          </div>
-          <button class="btn btn-yellow" id="mgOrderSubmit" style="width:100%">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg> Place Order
           </button>
         </div>
 
@@ -3570,7 +3560,7 @@
         btn.onclick = () => {
           $$('.mg-inv-tab').forEach(b => b.style.background = '');
           btn.style.background = 'var(--bgInput)';
-          ['Config','Stock','Order','History'].forEach(t => {
+          ['Config','Stock','History'].forEach(t => {
             const el = $('#mgTab-'+t);
             if (el) el.style.display = (t === btn.dataset.tab) ? '' : 'none';
           });
@@ -3579,6 +3569,76 @@
 
       overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
       $('#closeMgDetail').onclick = () => overlay.remove();
+
+      // ── SEARCHABLE LEVEL DROPDOWNS ────────────────────────────────
+      function bindMgLevelDropdown(inputId, dropId, searchId, listId) {
+        const inp = $('#' + inputId);
+        const drop = $('#' + dropId);
+        const srch = $('#' + searchId);
+        const list = $('#' + listId);
+        if (!inp || !drop) return;
+        const allItems = () => drop.querySelectorAll('.mg-lvl-option');
+        inp.onclick = (e) => {
+          e.stopPropagation();
+          // Close other mg dropdowns
+          $$('.mg-lvl-dropdown').forEach(d => { if (d.id !== dropId) d.classList.add('hidden'); });
+          drop.classList.toggle('hidden');
+          if (!drop.classList.contains('hidden') && srch) { srch.value = ''; srch.focus(); filterItems(''); }
+        };
+        function filterItems(q) {
+          allItems().forEach(item => {
+            const val = (item.dataset.value || '').toLowerCase();
+            item.style.display = (!q || val.includes(q.toLowerCase())) ? '' : 'none';
+          });
+        }
+        if (srch) srch.oninput = () => filterItems(srch.value);
+        allItems().forEach(item => {
+          item.onclick = (e) => {
+            e.stopPropagation();
+            const val = item.dataset.value || '';
+            inp.value = val;
+            drop.classList.add('hidden');
+            // Highlight selected
+            allItems().forEach(i => i.style.background = '');
+            item.style.background = 'rgba(124,58,237,0.13)';
+          };
+        });
+      }
+      bindMgLevelDropdown('mgDetailAssignedLevel', 'mgAssignedLevelDrop', 'mgAssignedLevelSearch', 'mgAssignedLevelList');
+      bindMgLevelDropdown('mgDetailHighestLevel',  'mgHighestLevelDrop',  'mgHighestLevelSearch',  'mgHighestLevelList');
+
+      // ── STOCK ACTION DROPDOWN ─────────────────────────────────────
+      (function() {
+        const inp = $('#mgStockAction');
+        const drop = $('#mgStockActionDrop');
+        if (!inp || !drop) return;
+        inp.onclick = (e) => { e.stopPropagation(); drop.classList.toggle('hidden'); };
+        drop.querySelectorAll('.mg-stock-option').forEach(item => {
+          item.onclick = (e) => {
+            e.stopPropagation();
+            inp.dataset.value = item.dataset.value;
+            inp.value = item.textContent.trim();
+            drop.classList.add('hidden');
+            drop.querySelectorAll('.mg-stock-option').forEach(i => i.style.background = '');
+            item.style.background = 'rgba(124,58,237,0.13)';
+          };
+        });
+      })();
+
+      // Close all mg dropdowns on outside click
+      document.addEventListener('click', function _mgDropClose(e) {
+        if (!e.target.closest('#mgDetailOverlay')) {
+          $$('.mg-lvl-dropdown').forEach(d => d.classList.add('hidden'));
+          document.removeEventListener('click', _mgDropClose);
+        } else {
+          $$('.mg-lvl-dropdown').forEach(d => {
+            if (!e.target.closest('#' + d.id) && !e.target.closest('[id$="LevelWrap"]') && e.target.id !== 'mgStockAction') {
+              d.classList.add('hidden');
+            }
+          });
+        }
+      });
+      // ─────────────────────────────────────────────────────────────
 
       // CONFIG SAVE
       $('#mgConfigSave').onclick = async () => {
@@ -3615,7 +3675,7 @@
       $('#mgStockApply').onclick = async () => {
         const amt = parseFloat($('#mgStockAmt').value) || 0;
         if (amt <= 0) { showPopup('Enter a valid amount', 'error'); return; }
-        const action = $('#mgStockAction').value;
+        const action = $('#mgStockAction').dataset.value || 'Add';
         const prev = g.remainingPoints || 0;
         let newAvail;
         if (action === 'Add')    newAvail = prev + amt;
@@ -3642,30 +3702,7 @@
         showPopup(`Stock ${action}: ${amt.toLocaleString()} pts → ${newAvail.toLocaleString()} available`, 'success');
       };
 
-      // ORDER SUBMIT
-      $('#mgOrderSubmit').onclick = async () => {
-        const amt = parseFloat($('#mgOrderAmt').value) || 0;
-        if (amt <= 0) { showPopup('Enter a valid order amount', 'error'); return; }
-        const username = $('#mgOrderUsername').value.trim();
-        const accountLevel = $('#mgOrderLevel').value;
-        const now = new Date().toISOString().slice(0,10);
-        const entry = { date: now, amount: amt, username, accountLevel, status: 'Pending' };
-        const newOrdered = (g.orderedPoints || 0) + amt;
-        const newOrderHistory = [...(g.orderHistory||[]), entry];
-        const btn = $('#mgOrderSubmit');
-        btn.disabled = true; btn.innerHTML = 'Placing...';
-        await trackedWrite(() => db.doc(`${userPath()}/masterGames/${g._id}`).update({
-          orderedPoints: newOrdered,
-          orderHistory: newOrderHistory
-        }));
-        g.orderedPoints = newOrdered;
-        g.orderHistory = newOrderHistory;
-        overlay.remove();
-        renderMasterGamesList();
-        bindMasterGameListEvents();
-        showMasterGameDetail(state.masterGames.find(x => x._id === g._id) || g);
-        showPopup(`Order placed: ${amt.toLocaleString()} pts pending from ${username||'superior'}`, 'success');
-      };
+
     }
 
     // ============================================================
@@ -4579,23 +4616,54 @@
               _saveBillInProgress = false;
               return;
             }
-            // Deduct from master games
+            // Deduct from master games (or increment orderedPoints for hierarchy ordering)
             for (const item of state.billItems) {
               if (item.gameId) {
                 const calc = calcLine(item);
                 const mg = state.masterGames.find(g => g.name === item.gameName);
                 if (mg) {
-                  const newPts = (mg.remainingPoints || 0) - calc.points;
-                  const _mgUpdatePayload = { remainingPoints: newPts };
-                  // Manager accounts: log billing history entry per game
-                  if (state.empRole !== 'employee') {
-                    const _billDate = bill.date || new Date().toISOString().slice(0,10);
-                    const _billingEntry = { date: _billDate, amount: calc.points, username: bill.username || '', billingType: 'Direct' };
-                    mg.billingHistory = [...(mg.billingHistory || []), _billingEntry];
-                    _mgUpdatePayload.billingHistory = mg.billingHistory;
+                  const _billDate = bill.date || new Date().toISOString().slice(0,10);
+                  // Hierarchy check: if the username's level matches the game's highest level,
+                  // the manager cannot load to that level directly — it must come from ordered stock.
+                  // Also: if the game has an assignedUsername and the bill username matches it
+                  // and their level equals the highestLevel configured for this game → ordered.
+                  const _itemUsername = item.username || '';
+                  const _userLevel = getUserLevel(c, _itemUsername, item.gameName);
+                  const _highestLevel = mg.highestLevel || '';
+                  const _assignedLevel = mg.assignedLevel || '';
+                  // isOrdered = true when billing to a username whose level equals the game's
+                  // highest configured account level (peer-level load → must source from ordered).
+                  // Agent accounts can load to anyone — always treated as Direct, never Ordered.
+                  const _isAgent = _userLevel === 'Agent' || _assignedLevel === 'Agent';
+                  const _isOrdered = !_isAgent && _highestLevel &&
+                    (_userLevel === _highestLevel || _assignedLevel === _highestLevel && _itemUsername === (mg.assignedUsername || ''));
+                  const _mgUpdatePayload = {};
+                  if (_isOrdered) {
+                    // Add to orderedPoints — do NOT touch remainingPoints
+                    const newOrdered = (mg.orderedPoints || 0) + calc.points;
+                    _mgUpdatePayload.orderedPoints = newOrdered;
+                    if (state.empRole !== 'employee') {
+                      const _orderEntry = { date: _billDate, amount: calc.points, username: _itemUsername, accountLevel: _userLevel || _assignedLevel, status: 'Auto' };
+                      mg.orderHistory = [...(mg.orderHistory || []), _orderEntry];
+                      _mgUpdatePayload.orderHistory = mg.orderHistory;
+                      const _billingEntry = { date: _billDate, amount: calc.points, username: _itemUsername, billingType: 'Ordered' };
+                      mg.billingHistory = [...(mg.billingHistory || []), _billingEntry];
+                      _mgUpdatePayload.billingHistory = mg.billingHistory;
+                    }
+                    await db.doc(userPath()+'/masterGames/'+mg._id).update(_mgUpdatePayload);
+                    mg.orderedPoints = newOrdered;
+                  } else {
+                    // Direct load — deduct from available balance
+                    const newPts = (mg.remainingPoints || 0) - calc.points;
+                    _mgUpdatePayload.remainingPoints = newPts;
+                    if (state.empRole !== 'employee') {
+                      const _billingEntry = { date: _billDate, amount: calc.points, username: _itemUsername, billingType: 'Direct' };
+                      mg.billingHistory = [...(mg.billingHistory || []), _billingEntry];
+                      _mgUpdatePayload.billingHistory = mg.billingHistory;
+                    }
+                    await db.doc(userPath()+'/masterGames/'+mg._id).update(_mgUpdatePayload);
+                    mg.remainingPoints = newPts;
                   }
-                  await db.doc(userPath()+'/masterGames/'+mg._id).update(_mgUpdatePayload);
-                  mg.remainingPoints = newPts;
                 }
               }
             }
@@ -7504,7 +7572,9 @@
           } catch(_crErr){ console.error('Credit recalc failed:', _crErr); }
           invalidateAnalyticsCache();
           _gbCache.set('data', {mg:state.masterGames, bills:state.bills, companies:state.companies});
-          ov.remove();refreshBillHistory();
+          ov.remove();
+          // refreshBillingPanel re-renders the entire billing content including credit card
+          refreshBillingPanel();
         }catch(e2){alert('Error: '+e2.message);delBtn.disabled=false;delBtn.textContent='Delete'}
       };
     }
