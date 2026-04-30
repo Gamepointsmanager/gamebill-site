@@ -3911,8 +3911,8 @@
           <button class="tab tab-cyan ${state.companyTab==='games'?'active':''}" data-tab="games"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><circle cx="16" cy="11" r="0.5" fill="currentColor"/><circle cx="18" cy="13" r="0.5" fill="currentColor"/></svg> Games Config</button>
           <button class="tab tab-purple ${state.companyTab==='analytics'?'active':''}" data-tab="analytics"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${state.empRole==='employee'?'<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M6 8h.01M9 8h.01M6 12h12"/>':'<path d="M21.21 15.89A10 10 0 118 2.83"/><path d="M22 12A10 10 0 0012 2v10z"/>'}</svg> ${state.empRole==='employee'?'Balance':'Analytics'}</button>
         </div>
-        <div id="tabContent">
-          ${state.companyTab === 'billing' ? '<div id="billingContent">' + renderBilling(c) + '</div>' : ''}
+        <div id="tabContent" style="padding:0 2px">
+          ${state.companyTab === 'billing' ? '<div id="billingContent" style="padding-bottom:80px">' + renderBilling(c) + '</div>' : ''}
           ${state.companyTab === 'games' ? renderGamesRates(c) : ''}
           ${state.companyTab === 'analytics' ? renderAnalytics(c) : ''}
         </div>
@@ -3990,7 +3990,7 @@
           </div>
         </div>
 
-        <div id="billItemsContainer" style="position:relative;">
+        <div id="billItemsContainer" style="position:relative;margin-bottom:8px">
           ${items.map((item, idx) => renderBillItem(item, idx, assignedGames, usernames)).join('')}
         </div>
 
@@ -6578,8 +6578,102 @@
       var _pmOpts = cfPaymentMethods.length > 0
         ? '<option value="">— None —</option>' + cfPaymentMethods.map(function(pm){ return '<option value="'+esc(pm.id)+'">'+esc(pm.name)+'</option>'; }).join('')
         : '<option value="">No payment methods</option>';
-      var ov=document.createElement('div');ov.className='modal-overlay';ov.id='paymentRecordModal';ov.innerHTML='<div class="modal fade-in" style="max-width:480px"><div class="modal-header"><h3 class="modal-title">PAYMENTS</h3><button class="btn btn-ghost btn-sm" id="closePayM"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div><div style="display:flex;gap:10px;padding:14px;border-radius:12px;background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.12);margin-bottom:14px;flex-wrap:wrap"><div style="flex:1;text-align:center;min-width:80px"><div style="font-size:10px;color:#22d3ee;text-transform:uppercase;font-weight:700;margin-bottom:2px">Received</div><div style="font-size:18px;font-weight:800;color:#34d399;font-family:Orbitron,monospace">$'+d.totalReceived.toFixed(2)+'</div></div><div style="width:1px;background:rgba(120,100,200,0.12)"></div><div style="flex:1;text-align:center;min-width:80px"><div style="font-size:10px;color:'+(d.totalBalance>0?'#f472b6':'#34d399')+';text-transform:uppercase;font-weight:700;margin-bottom:2px">'+(d.totalBalance<0?'Credit':'Balance')+'</div><div style="font-size:18px;font-weight:800;color:'+(d.totalBalance>0?'#f472b6':'#34d399')+';font-family:Orbitron,monospace">'+'$'+Math.abs(d.totalBalance).toFixed(2)+'</div></div>'+(d.totalRedeemedDollars>0?'<div style="width:100%;padding:6px 10px;border-radius:8px;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.1);font-size:11px;display:flex;justify-content:space-between"><span style="color:#fbbf24;font-weight:600">Redeemed Value</span><span style="color:#fbbf24;font-weight:700">$'+d.totalRedeemedDollars.toFixed(2)+'</span></div><div style="width:100%;padding:4px 10px;font-size:11px;display:flex;justify-content:space-between"><span style="color:var(--textMuted)">Net Received</span><span style="color:#22d3ee;font-weight:700">$'+(d.totalReceived-d.totalRedeemedDollars).toFixed(2)+'</span></div>':'')+'</div>'+(creditBal>0?'<div style="padding:10px 14px;border-radius:10px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);margin-bottom:14px;display:flex;align-items:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22,4 12,14.01 9,11.01"/></svg><span style="font-size:12px;color:#34d399;font-weight:700">Available Credit: $'+creditBal.toFixed(2)+'</span><span style="font-size:10px;color:var(--textMuted);margin-left:auto">Auto-applied to future bills</span></div>':'')+'<div style="margin-bottom:14px"><h4 style="font-family:Orbitron,monospace;font-size:11px;color:var(--textSecondary);margin-bottom:8px">RECORD PAYMENT</h4><div style="margin-bottom:8px"><span class="label" style="font-size:9px">Bill</span><select class="input styled-select" id="payBill" style="font-size:12px;background-color:var(--bgInput)">'+opts+'</select></div><div style="display:flex;gap:8px"><div style="flex:1"><span class="label" style="font-size:9px">Amount ($)</span><input class="input" type="number" id="payAmt" placeholder="0.00" step="0.01" min="0"/></div><div style="flex:1"><span class="label" style="font-size:9px">Date</span><input class="input" type="date" id="payDt" value="'+localDateStr()+'"/></div></div>'+(cfPaymentMethods.length>0?'<div style="margin-top:8px"><span class="label" style="font-size:9px">Payment Method</span><select class="input styled-select" id="payMethod" style="font-size:12px;background-color:var(--bgInput)">'+_pmOpts+'</select></div>':'')+'<button class="btn btn-green btn-full btn-sm" id="paySave" style="margin-top:10px;justify-content:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg> Record</button></div><h4 style="font-family:Orbitron,monospace;font-size:11px;color:var(--textSecondary);margin-bottom:6px">HISTORY</h4><div style="max-height:200px;overflow-y:auto;border-radius:10px;background:rgba(15,12,28,0.4);border:1px solid rgba(120,100,200,0.08)">'+hH+'</div></div>';
+        // Pre-build payment method list items for custom dropdown (safe from escaping issues)
+        var _pmListItems = '<div class=\"dropdown-item\" data-pmid=\"\" style=\"font-style:italic;color:var(--textMuted)\">— None —</div>';
+        if(cfPaymentMethods.length>0){ cfPaymentMethods.forEach(function(pm){ _pmListItems += '<div class=\"dropdown-item\" data-pmid=\"'+esc(pm.id)+'\" data-pmname=\"'+esc(pm.name)+'\">'+esc(pm.name)+'</div>'; }); }
+      var ov=document.createElement('div');
+      ov.className='modal-overlay';
+      ov.id='paymentRecordModal';
+      // Build modal HTML cleanly to avoid escaping issues
+      var _modalInner = '<div class="modal fade-in" style="max-width:480px">'
+        + '<div class="modal-header"><h3 class="modal-title">PAYMENTS</h3>'
+        + '<button class="btn btn-ghost btn-sm" id="closePayM"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>'
+        // Stats row
+        + '<div style="display:flex;gap:10px;padding:14px;border-radius:12px;background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.12);margin-bottom:14px;flex-wrap:wrap">'
+        +   '<div style="flex:1;text-align:center;min-width:80px"><div style="font-size:10px;color:#22d3ee;text-transform:uppercase;font-weight:700;margin-bottom:2px">Received</div>'
+        +   '<div style="font-size:18px;font-weight:800;color:#34d399;font-family:Orbitron,monospace">$' + d.totalReceived.toFixed(2) + '</div></div>'
+        +   '<div style="width:1px;background:rgba(120,100,200,0.12)"></div>'
+        +   '<div style="flex:1;text-align:center;min-width:80px">'
+        +     '<div style="font-size:10px;color:' + (d.totalBalance>0?'#f472b6':'#34d399') + ';text-transform:uppercase;font-weight:700;margin-bottom:2px">' + (d.totalBalance<0?'Credit':'Balance') + '</div>'
+        +     '<div style="font-size:18px;font-weight:800;color:' + (d.totalBalance>0?'#f472b6':'#34d399') + ';font-family:Orbitron,monospace">$' + Math.abs(d.totalBalance).toFixed(2) + '</div>'
+        +   '</div>'
+        +   (d.totalRedeemedDollars>0
+              ? '<div style="width:100%;padding:6px 10px;border-radius:8px;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.1);font-size:11px;display:flex;justify-content:space-between">'
+              +   '<span style="color:#fbbf24;font-weight:600">Redeemed Value</span>'
+              +   '<span style="color:#fbbf24;font-weight:700">$' + d.totalRedeemedDollars.toFixed(2) + '</span></div>'
+              +   '<div style="width:100%;padding:4px 10px;font-size:11px;display:flex;justify-content:space-between">'
+              +   '<span style="color:var(--textMuted)">Net Received</span>'
+              +   '<span style="color:#22d3ee;font-weight:700">$' + (d.totalReceived-d.totalRedeemedDollars).toFixed(2) + '</span></div>'
+              : '')
+        + '</div>'
+        // Credit badge
+        + (creditBal>0
+            ? '<div style="padding:10px 14px;border-radius:10px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);margin-bottom:14px;display:flex;align-items:center;gap:8px">'
+            +   '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22,4 12,14.01 9,11.01"/></svg>'
+            +   '<span style="font-size:12px;color:#34d399;font-weight:700">Available Credit: $' + creditBal.toFixed(2) + '</span>'
+            +   '<span style="font-size:10px;color:var(--textMuted);margin-left:auto">Auto-applied to future bills</span></div>'
+            : '')
+        // Record payment form
+        + '<div style="margin-bottom:14px">'
+        +   '<h4 style="font-family:Orbitron,monospace;font-size:11px;color:var(--textSecondary);margin-bottom:8px">RECORD PAYMENT</h4>'
+        +   '<div style="margin-bottom:8px"><span class="label" style="font-size:9px">Bill</span>'
+        +   '<select class="input styled-select" id="payBill" style="font-size:12px;background-color:var(--bgInput)">' + opts + '</select></div>'
+        +   '<div style="display:flex;gap:8px">'
+        +     '<div style="flex:1"><span class="label" style="font-size:9px">Amount ($)</span>'
+        +     '<input class="input" type="number" id="payAmt" placeholder="0.00" step="0.01" min="0"/></div>'
+        +     '<div style="flex:1"><span class="label" style="font-size:9px">Date</span>'
+        +     '<input class="input" type="date" id="payDt" value="' + localDateStr() + '"/></div>'
+        +   '</div>'
+        // Payment method custom dropdown
+        + (cfPaymentMethods.length > 0
+            ? '<div style="margin-top:8px" id="payMethodWrap">'
+            +   '<span class="label" style="font-size:9px">Payment Method</span>'
+            +   '<div id="payMethodBtn" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bgInput);font-size:12px;color:var(--textPrimary);user-select:none">'
+            +     '<span id="payMethodLabel">— None —</span>'
+            +     '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6,9 12,15 18,9"/></svg>'
+            +   '</div>'
+            +   '<input type="hidden" id="payMethod" value=""/>'
+            +   '<div id="payMethodList" class="hidden" style="position:fixed;background:rgba(16,13,30,0.98);border:1px solid var(--glassBorder);border-radius:10px;z-index:99999;max-height:200px;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,0.7)">'
+            +     _pmListItems
+            +   '</div></div>'
+            : '')
+        +   '<button class="btn btn-green btn-full btn-sm" id="paySave" style="margin-top:10px;justify-content:center">'
+        +     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg> Record'
+        +   '</button>'
+        + '</div>'
+        // History
+        + '<h4 style="font-family:Orbitron,monospace;font-size:11px;color:var(--textSecondary);margin-bottom:6px">HISTORY</h4>'
+        + '<div style="max-height:200px;overflow-y:auto;border-radius:10px;background:rgba(15,12,28,0.4);border:1px solid rgba(120,100,200,0.08)">' + hH + '</div>'
+        + '</div>';
+      ov.innerHTML = _modalInner;
       document.body.appendChild(ov);ov.onclick=function(e){if(e.target===ov)ov.remove()};document.getElementById('closePayM').onclick=function(){ov.remove()};
+      // Bind payment method custom dropdown item clicks
+      var _pmList = document.getElementById('payMethodList');
+      var _pmBtn  = document.getElementById('payMethodBtn');
+      if(_pmBtn){ _pmBtn.onclick = function(){
+        var list = document.getElementById('payMethodList');
+        if(!list) return;
+        var r = _pmBtn.getBoundingClientRect();
+        list.style.top  = (r.bottom+4)+'px';
+        list.style.left = r.left+'px';
+        list.style.minWidth = r.width+'px';
+        list.classList.toggle('hidden');
+      }; }
+      if(_pmList){ _pmList.querySelectorAll('.dropdown-item[data-pmid]').forEach(function(item){
+        item.onclick = function(){
+          document.getElementById('payMethod').value = item.dataset.pmid || '';
+          document.getElementById('payMethodLabel').textContent = item.dataset.pmname || '— None —';
+          _pmList.classList.add('hidden');
+        };
+      }); }
+      // Close custom payment method dropdown on outside click
+      var _pmOutsideFn = function(e){
+        var list=document.getElementById('payMethodList');
+        var wrap=document.getElementById('payMethodWrap');
+        if(!list){document.removeEventListener('click',_pmOutsideFn);return;}
+        if(wrap&&!wrap.contains(e.target)) list.classList.add('hidden');
+      };
+      document.addEventListener('click', _pmOutsideFn);
       ov.querySelectorAll('.pay-edit-btn').forEach(function(eb){eb.onclick=function(){
         var bid=eb.dataset.billid,pidx=parseInt(eb.dataset.payidx),oldAmt=eb.dataset.amt,oldDate=eb.dataset.date;
         var pev=document.createElement('div');pev.className='modal-overlay';pev.id='payEditModal';pev.style.zIndex='1002';
@@ -7017,6 +7111,10 @@
       if (!state.globalDateTo) state.globalDateTo=today;
       var f=new Date(state.globalDateFrom+'T00:00:00');var t=localEndOfDay(state.globalDateTo);
       var d=computeGlobalData(f,t);
+      // Cache the latest gPr so Cash Flow Shareholders tab can reuse it without recomputing
+      state._lastGaPr = d.gPr;
+      state._lastGaF  = f;
+      state._lastGaT  = t;
       // Compute operating expenses async and inject into card after render
       var opEx = state.globalOpEx || { total:0, empData:[], loaded:false };
       if (!opEx.loaded) {
@@ -7024,6 +7122,8 @@
           state.globalOpEx = result;
           window._gaOpEx = result;
           var grossProfit = d.gPr - result.total;
+          // Update cached gross profit so shareholders tab has fresh value
+          state._lastGaGrossProfit = grossProfit;
           var gpS = grossProfit>=0?'+':'';
           // Update OpEx card values
           var valEl = document.getElementById('gaOpExVal');
@@ -10895,12 +10995,13 @@
       else if (tab === 'methods') content = renderCFMethods();
       else if (tab === 'expenses') content = renderCFExpenses(summary);
       else if (tab === 'shareholders') {
-        // Pool = Global Analytics Gross Profit (gPr) minus operating expenses
-        // Uses state.globalOpEx (cached by fetchOperatingExpenses) — safe to use synchronously
-        var _gaD = computeGlobalData(null, null);
+        // Pool = Global Analytics Gross Profit (same value shown in GA P/L card)
+        // Use the cached value from the last GA page render to avoid recomputing
+        // (recomputing can give 0 if getGameRate returns 0 or items are not loaded)
+        var _gaPr = state._lastGaPr != null ? state._lastGaPr : computeGlobalData(null, null).gPr;
         var _opExTotal = (state.globalOpEx && state.globalOpEx.total) || 0;
         var _cfOpExTotal = (cfOperatingExpenses || []).reduce(function(s, e){ return s + (e.amount || 0); }, 0);
-        var _poolAmount = _gaD.gPr - _opExTotal - _cfOpExTotal;
+        var _poolAmount = _gaPr - _opExTotal - _cfOpExTotal;
         content = renderCFShareholders(_poolAmount);
       }
 
