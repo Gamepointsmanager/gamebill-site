@@ -8210,11 +8210,14 @@
     // ─────────────────────────────────────────────────────────────────────────────
 
     async function checkUserAccessByUid(ownerUid) {
+      let anyReadSucceeded = false;
+
       // Primary: read embedded access from employeeLinks doc (cashier can read their own)
       try {
         const linkKey = emailToKey((state.user?.email || '').toLowerCase().trim());
         const linkDoc = await db.collection('employeeLinks').doc(linkKey).get();
         console.log('[checkAccess] employeeLinks read — exists:', linkDoc.exists, '| key:', linkKey);
+        anyReadSucceeded = true;
         if (linkDoc.exists) {
           const link = linkDoc.data();
           console.log('[checkAccess] link data:', JSON.stringify({
@@ -8227,6 +8230,11 @@
             console.log('[checkAccess] ✓ Access granted via embedded ownerHasAccess flag');
             return { hasAccess: true };
           }
+          // Explicit denial
+          if (link.ownerHasAccess === false) {
+            console.log('[checkAccess] ✗ Access explicitly denied via ownerHasAccess=false');
+            return { hasAccess: false };
+          }
           // Fallback: check expiry date embedded at sync time
           if (link.ownerAccessExpiry) {
             const exp = link.ownerAccessExpiry.toDate ? link.ownerAccessExpiry.toDate() : new Date(link.ownerAccessExpiry);
@@ -8234,6 +8242,10 @@
             console.log('[checkAccess] ownerAccessExpiry daysLeft:', daysLeft);
             if (daysLeft > 0) return { hasAccess: true };
           }
+          // Doc exists but has no access flags yet (owner hasn't synced yet) — grant tentative access
+          // The employee was already found in the org, trust that
+          console.log('[checkAccess] employeeLinks doc exists but no access flags — granting tentative access');
+          return { hasAccess: true };
         }
       } catch(e) {
         console.error('[checkAccess] employeeLinks read failed:', e.code, e.message);
@@ -8243,6 +8255,7 @@
       try {
         const doc = await db.collection('userAccess').doc(ownerUid).get();
         console.log('[checkAccess] userAccess fallback — exists:', doc.exists);
+        anyReadSucceeded = true;
         if (doc.exists) {
           const data = doc.data();
           console.log('[checkAccess] userAccess data:', JSON.stringify({
@@ -8261,6 +8274,14 @@
         }
       } catch(e) {
         console.warn('[checkAccess] userAccess read blocked (expected if security rules deny cross-user reads):', e.code);
+      }
+
+      // If both Firestore reads failed due to errors (not explicit denial), fail-open:
+      // the employee has already been authenticated via Firebase Auth and found in the org.
+      // Blocking them due to a transient read error would be incorrect.
+      if (!anyReadSucceeded) {
+        console.log('[checkAccess] All reads failed — granting fail-open access (transient error)');
+        return { hasAccess: true };
       }
 
       console.log('[checkAccess] No access found via any method');
@@ -10874,14 +10895,12 @@
       else if (tab === 'methods') content = renderCFMethods();
       else if (tab === 'expenses') content = renderCFExpenses(summary);
       else if (tab === 'shareholders') {
-        // Pool = Global Analytics Gross Profit (same value shown in GA Profit/Loss card's "Gross Profit" sub-label)
-        // = gPr (billing profit) minus operating expenses (employee wages + CF operating expenses)
+        // Pool = Global Analytics Gross Profit (gPr) minus operating expenses
+        // Uses state.globalOpEx (cached by fetchOperatingExpenses) — safe to use synchronously
         var _gaD = computeGlobalData(null, null);
-        var _opEx = computeEmployeeOpEx(null, null);
-        var _cfOpExTotal = (_cfLoaded && cfOperatingExpenses.length > 0)
-          ? cfOperatingExpenses.reduce(function(s, e){ return s + (e.amount || 0); }, 0)
-          : 0;
-        var _poolAmount = _gaD.gPr - (_opEx.total || 0) - _cfOpExTotal;
+        var _opExTotal = (state.globalOpEx && state.globalOpEx.total) || 0;
+        var _cfOpExTotal = (cfOperatingExpenses || []).reduce(function(s, e){ return s + (e.amount || 0); }, 0);
+        var _poolAmount = _gaD.gPr - _opExTotal - _cfOpExTotal;
         content = renderCFShareholders(_poolAmount);
       }
 
